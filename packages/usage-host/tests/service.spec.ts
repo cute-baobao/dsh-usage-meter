@@ -7,6 +7,7 @@ import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { remoteMethods } from '@deepseek-ai/dsh-typert-protocol'
+import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import { afterEach, describe, expect, it } from 'vitest'
 import UsageMeterService from '../src/index.ts'
 
@@ -58,6 +59,7 @@ async function mount(): Promise<{ ctx: Context; dir: string }> {
   const dir = await mkdtemp(join(tmpdir(), 'dsh-usage-meter-test-'))
   dirs.push(dir)
   const ctx = new Context()
+  await ctx.plugin(TypertRegistry)
   ctx.provide('dshHomePath', dshHomePath)
   ctx.provide('sessions', { list: () => [] } as never)
   await ctx.plugin(UsageMeterService, { dir, timezone: 'utc' })
@@ -80,6 +82,18 @@ describe('UsageMeterService', () => {
     expect(remoteMethods(ctx.usageMeter)).toEqual([
       { method: 'summary', invocation: { kind: 'direct' } },
     ])
+  })
+
+  it('registers the strict Typert endpoint the gateway claims', async () => {
+    const { ctx } = await mount()
+    const descriptor = ctx.typert.local.get('usage-meter/summary')
+    expect(descriptor).toMatchObject({
+      namespace: 'usage-meter',
+      method: 'summary',
+      service: 'usageMeter',
+      invocation: { kind: 'direct' },
+    })
+    expect(ctx.typert.local.get('usageMeter/summary')).toBeUndefined()
   })
 
   it('folds session events into a summary and persists the JSONL ledger', async () => {
@@ -122,6 +136,7 @@ describe('UsageMeterService', () => {
     // A second mount over the same directory must start from the persisted
     // ledger instead of zero.
     const fresh = new Context()
+    await fresh.plugin(TypertRegistry)
     fresh.provide('dshHomePath', dshHomePath)
     fresh.provide('sessions', { list: () => [] } as never)
     await fresh.plugin(UsageMeterService, { dir, timezone: 'utc' })

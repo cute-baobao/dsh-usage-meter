@@ -23,6 +23,7 @@ import s from '@deepseek-ai/schemastery'
 import { applyEvent, createSessionFoldState, type SessionFoldState } from './fold.ts'
 import { UsageLedger, type DayTimezone } from './ledger.ts'
 import { JsonlUsageStore } from './store.ts'
+import { registerUsageMeterRemote } from './typert.ts'
 import type { CallRecord, UsageSummary } from './types.ts'
 
 export type { CallRecord, UsageBucket, UsageDay, UsageSummary } from './types.ts'
@@ -63,7 +64,7 @@ function resolveDir(ctx: Context, config: Config): string {
  * @typert service usageMeter
  */
 export class UsageMeterService extends TypertRemoteService {
-  static inject = ['sessions', 'dshHomePath']
+  static inject = ['sessions', 'dshHomePath', 'typert']
 
   /** Loader validation for the one deployment-varying policy. */
   static Config: s<Config> = s.object({
@@ -94,11 +95,14 @@ export class UsageMeterService extends TypertRemoteService {
   }
 
   /**
-   * Load the persisted ledger, backfill every live session, and subscribe to
-   * the event firehose.
+   * Load the persisted ledger, backfill every live session, register the
+   * strict Typert endpoint, and subscribe to the event firehose.
    */
   protected async [Service.init](): Promise<void> {
     this.ledger = new UsageLedger(this.timezone, await this.store.load())
+    // Strict registration makes the gateway claim /api/usage-meter/summary
+    // without the SRC marker scan (instance-dependent across module copies).
+    this.ctx.effect(() => registerUsageMeterRemote(this.ctx), 'usage-meter: typert contribution')
     // Backfill sessions already live in the store at install time; historical
     // sessions that were never loaded are not scanned (see README).
     for (const session of this.ctx.sessions.list()) this.backfill(session)

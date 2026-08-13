@@ -27,10 +27,12 @@ English | [中文](README.md)
 All three packages (`usage-host` / `usage-ui` / `usage-bundle`) are published on npm under the `@dsh-usage-meter` organization:
 
 ```sh
-dsh plugin --profile web add @dsh-usage-meter/usage-bundle
+dsh plugin --profile web add @dsh-usage-meter/usage-bundle @dsh-usage-meter/usage-host@0.1.1 --registry=https://registry.npmjs.org/
 ```
 
 The bundle layer mounts both the host recorder and the browser dashboard automatically, and installs its two dependency packages into the profile.
+
+> **Why pin `usage-host@0.1.1` explicitly**: the profile enables pnpm's supply-chain release-age policy, which silently skips versions published less than a day ago during range resolution — a bare `add @dsh-usage-meter/usage-bundle` can land on the buggy `0.1.0` (dashboard shows “Failed to load usage data / HTTP 404”). Requesting the exact version lets pnpm auto-exempt and install it. Once `0.1.1` passes the age window, the pin is no longer required.
 
 ### Option B — from this repository (source / pre-release)
 
@@ -114,14 +116,14 @@ Override the host row in your profile's `cordis.patch.yml` (patch layers replace
 
 | Symptom | Cause & fix |
 |---|---|
-| Dashboard shows “Failed to load usage data” | The running `dsh web` process predates the plugin (or its last upgrade). Host plugins load only at boot — **restart `dsh web`** and refresh the page. |
+| Dashboard shows “Failed to load usage data” | First **restart `dsh web`** (host plugins load only at boot) and refresh the page. If it still fails, confirm `usage-host@0.1.1` is what got installed (`node -e "console.log(require(process.env.HOME+'/.dsh/profiles/web/node_modules/@dsh-usage-meter/usage-host/package.json').version)"`) — the supply-chain policy may have silently installed the buggy `0.1.0`; reinstall with the pinned command in the install section. |
 | Settings page shows “No usage recorded yet” | No model calls have completed since install. Usage is recorded when an `assistant/message` carries a provider usage sample. |
 | The settings entry is missing entirely | The profile patch rows are absent. Re-check the installation steps and the rows in `$DSH_HOME/profiles/web/cordis.patch.yml`. |
 | No data for a session from before the install | Expected: history before the install time is not scanned (only live sessions at startup are backfilled). |
 
 ## How it works (maintainers)
 
-- The host plugin `UsageMeterService` extends `TypertRemoteService` (`@deepseek-ai/dsh-typert-protocol`) and exposes `/api/usage-meter/summary` — the gateway derives the endpoint from the service binding, no code generation.
+- The host plugin `UsageMeterService` extends `TypertRemoteService` (`@deepseek-ai/dsh-typert-protocol`); the `/api/usage-meter/summary` endpoint is **strictly registered** via `ctx.typert.register()` (not derived from the SRC marker scan — that scan reads a module-private table that splits across two protocol instances when the harness runs from source while this package resolves the protocol from the profile, the 0.1.1 fix).
 - The browser plugin registers into the `settings.section` slot and reads the snapshot over `connection.rpc.call('/api', 'usage-meter/summary', …)`.
 - The client bundle is built with a tsdown preset vendored from the harness (`tsdown.preset.ts`): a `window.__ModuleLoader__.load(...)` closure factory with platform modules externalized and a purity gate against cross-plugin value imports.
 

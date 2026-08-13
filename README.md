@@ -27,10 +27,12 @@
 三个包（`usage-host` / `usage-ui` / `usage-bundle`）已发布在 npm 的 `@dsh-usage-meter` 组织下：
 
 ```sh
-dsh plugin --profile web add @dsh-usage-meter/usage-bundle
+dsh plugin --profile web add @dsh-usage-meter/usage-bundle @dsh-usage-meter/usage-host@0.1.1 --registry=https://registry.npmjs.org/
 ```
 
 bundle 层会自动挂载 host 记录器和浏览器仪表盘，并把两个依赖包一并装进 profile。
+
+> **为什么显式钉 `usage-host@0.1.1`**：profile 启用了 pnpm 的供应链 release-age 策略，新发布不足 1 天的版本在范围解析时会被**静默跳过**——只写 `add @dsh-usage-meter/usage-bundle` 可能装到有 bug 的 `0.1.0`（仪表盘报「读取用量数据失败 / HTTP 404」）。显式指定版本时 pnpm 会自动放行并安装。等 `0.1.1` 过了 1 天窗口后，这条钉版本就不是必须的了。
 
 ### 方式二：从本仓库安装（源码 / 未发布时）
 
@@ -113,14 +115,14 @@ dsh plugin --profile web update @dsh-usage-meter/usage-bundle
 
 | 现象 | 原因与处理 |
 |---|---|
-| 仪表盘提示「读取用量数据失败」 | 正在运行的 `dsh web` 进程早于插件（或插件升级）启动。宿主插件只在启动时加载——**重启 `dsh web`** 并刷新页面。 |
+| 仪表盘提示「读取用量数据失败」 | 先**重启 `dsh web`**（宿主插件只在启动时加载）并刷新页面。若仍失败，确认装到的是 `usage-host@0.1.1`（`node -e "console.log(require(process.env.HOME+'/.dsh/profiles/web/node_modules/@dsh-usage-meter/usage-host/package.json').version)"`）——供应链策略可能静默装成有 bug 的 `0.1.0`，按安装章节的钉版本命令重装。 |
 | 设置页显示「暂无用量记录」 | 安装后还没有完成过模型调用。只有当 `assistant/message` 携带 provider 用量采样时才会计数。 |
 | 设置页里没有「用量统计」入口 | profile 的 patch 行缺失。按安装步骤核对 `$DSH_HOME/profiles/web/cordis.patch.yml` 中的两行。 |
 | 安装前的会话没有数据 | 符合预期：安装时间之前的历史不会扫描（仅启动时存活的会话会被回填）。 |
 
 ## 工作原理（维护者）
 
-- host 插件 `UsageMeterService` 继承 `TypertRemoteService`（`@deepseek-ai/dsh-typert-protocol`），暴露 `/api/usage-meter/summary`——网关从服务绑定自动推导端点，无需代码生成。
+- host 插件 `UsageMeterService` 继承 `TypertRemoteService`（`@deepseek-ai/dsh-typert-protocol`），端点 `/api/usage-meter/summary` 通过 `ctx.typert.register()` **严格注册**到网关（不依赖 SRC 标记扫描——那套机制在 harness 源码启动与 npm 包解析出两份 protocol 实例时会失效，见 0.1.1 修复）。
 - 浏览器插件注册进 `settings.section` 槽位，通过 `connection.rpc.call('/api', 'usage-meter/summary', …)` 读取聚合快照。
 - 客户端 bundle 用移植自 harness 的 tsdown preset（`tsdown.preset.ts`）构建：`window.__ModuleLoader__.load(...)` 闭包工厂，平台模块外置，并带跨插件值导入纯度门。
 

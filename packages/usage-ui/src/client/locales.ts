@@ -27,6 +27,19 @@ export const zh = {
   'day.total': '当日合计',
   'grand.total': '总计',
   'updatedAt': '更新时间',
+  'dashboard.title': '用量概览',
+  'metric.tokens': '累计 Tokens',
+  'metric.tokensUnit': 'Tokens',
+  'metric.calls': 'API 请求次数',
+  'metric.callsUnit': '次请求',
+  'metric.activeDays': '个活跃日期',
+  'metric.models': '使用模型',
+  'metric.modelsDetail': '已记录模型数',
+  'chart.tokens': 'Tokens 趋势',
+  'chart.calls': '请求次数趋势',
+  'chart.daily': '按日聚合',
+  'models.title': '模型明细',
+  'models.description': '按模型累计',
 } as const
 
 export const en = {
@@ -48,6 +61,19 @@ export const en = {
   'day.total': 'Day total',
   'grand.total': 'Total',
   'updatedAt': 'Updated at',
+  'dashboard.title': 'Usage overview',
+  'metric.tokens': 'Total tokens',
+  'metric.tokensUnit': 'tokens',
+  'metric.calls': 'API requests',
+  'metric.callsUnit': 'requests',
+  'metric.activeDays': 'active days',
+  'metric.models': 'Models used',
+  'metric.modelsDetail': 'recorded models',
+  'chart.tokens': 'Token trend',
+  'chart.calls': 'Request trend',
+  'chart.daily': 'Daily aggregate',
+  'models.title': 'Model breakdown',
+  'models.description': 'Cumulative by model',
 } as const
 
 /** Union of the dictionary keys both locales define. */

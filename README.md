@@ -1,149 +1,127 @@
 # dsh-usage-meter
 
-记录 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的 token 用量——按模型、按天——并在 Web GUI 里用仪表盘展示。
+为 DeepSeek Harness 记录按「模型 × 天」的 token 用量——自动采集，Web GUI 设置页一目了然。
 
-插件自动记录每一次模型调用的**输入、输出、缓存命中、缓存写入**，按**模型 × 自然日**聚合，持久化到本地，并在设置面板里渲染一个「用量统计」页面。
+[🌐 English](README.en.md) · 中文
 
-[English](README.en.md) | 中文
+---
 
-## 功能
+dsh 的用量信息散在会话日志里，想按月看每个模型烧了多少 token、缓存命中多少，得自己翻。dsh-usage-meter 把每次模型调用的 **输入 / 输出 / 缓存命中 / 缓存写入** 自动折叠成每日分模型统计，持久化到本地，并在设置页渲染成仪表盘。
 
-- **零配置**：装好插件、重启 `dsh web` 即可，之后每次模型调用自动记录。
-- **按模型 × 天明细**：调用次数、输入（未命中缓存）、输出、缓存命中（cache read）、缓存写入（cache write）、计费合计。
-- **本地持久化**：追加式 JSONL 账本，位于 `$DSH_HOME/usage-meter/usage.jsonl`。
-- **Web GUI 仪表盘**：设置页展示累计用量与每日分模型表格。
-- **安全可逆**：纯插件实现，不改动 harness 核心；卸载后数据原样保留。
+**🎯 用量不该靠猜——打开设置页就能看到。**
 
-## 环境要求
+## 亮点
 
-- 安装了 **web profile** 的 DeepSeek Harness（`dsh web`）。
-- 从源码构建需要 Node `^22.19 || >=24` 和 pnpm。
-- 依赖解析自 npm 的 `next` 标签（`0.1.0-rc.6` 线）。**不要**使用陈旧的 `latest` 标签（`0.0.1-rc.1`），它引用了一个已下架的依赖。
+- **零配置自动记录** — 装好、重启 `dsh web`，之后每次模型调用自动入账，无需任何操作。
+- **按模型 × 天聚合** — 每天一张表，每个模型一行：调用次数、输入、输出、缓存命中、缓存写入、计费合计。
+- **输入与缓存分开统计** — 计费输入拆成未命中缓存 / 缓存命中 / 缓存写入三份，命中多少一眼可见。
+- **本地持久化** — 追加式 JSONL 账本 `$DSH_HOME/usage-meter/usage.jsonl`，可查、可删、可迁移。
+- **双语仪表盘** — 设置页「用量统计」中英双语，跟随 Web GUI 的语言设置。
 
-## 安装
+## 界面长什么样
 
-### 方式一：npm 包（推荐）
+设置 → **用量统计**：
 
-三个包（`usage-host` / `usage-ui` / `usage-bundle`）已发布在 npm 的 `@dsh-usage-meter` 组织下：
+```
+累计用量
+  模型               调用   输入(未缓存)   输出   缓存命中    计费合计
+  deepseek-v4-flash   10      3,762    6,477  2,913,280  2,917,042
+  deepseek-v4-pro     16     22,671   20,127  5,240,832  5,263,503
+  总计               26     26,433   26,604  8,154,112  8,180,545
 
-```sh
-dsh plugin --profile web add @dsh-usage-meter/usage-bundle @dsh-usage-meter/usage-host@0.1.1 --registry=https://registry.npmjs.org/
+每日用量 · 2026-08-13  …（同上，按天拆成一张张表，含当日合计）
 ```
 
-bundle 层会自动挂载 host 记录器和浏览器仪表盘，并把两个依赖包一并装进 profile。
+| 列 | 含义 |
+|---|---|
+| 调用次数 | 该模型当天完成的模型调用数 |
+| 输入（未缓存） | 未命中缓存的输入 tokens（`inputTokens`） |
+| 输出 | 输出 tokens（`outputTokens`） |
+| 缓存命中 | 命中缓存的 tokens（`cacheReadTokens`，即 DeepSeek `prompt_cache_hit_tokens`） |
+| 缓存写入 | 缓存写入 tokens（`cacheWriteTokens`，DeepSeek 暂不单独上报，通常为 0） |
+| 计费合计 | 输入 + 缓存命中 + 缓存写入，即计费输入等价总量 |
 
-> **为什么显式钉 `usage-host@0.1.1`**：profile 启用了 pnpm 的供应链 release-age 策略，新发布不足 1 天的版本在范围解析时会被**静默跳过**——只写 `add @dsh-usage-meter/usage-bundle` 可能装到有 bug 的 `0.1.0`（仪表盘报「读取用量数据失败 / HTTP 404」）。显式指定版本时 pnpm 会自动放行并安装。等 `0.1.1` 过了 1 天窗口后，这条钉版本就不是必须的了。
-
-### 方式二：从本仓库安装（源码 / 未发布时）
-
-```sh
-# 1. 把两个包装进 web profile（绝对路径不会被 CLI 改写）
-dsh plugin --profile web add \
-  /path/to/dsh-usage-meter/packages/usage-host \
-  /path/to/dsh-usage-meter/packages/usage-ui
-
-# 2. 在 profile 的用户 patch 层挂载两个插件行
-cat >> "$DSH_HOME/profiles/web/cordis.patch.yml" <<'EOF'
-- insert:
-    - id: usage-meter
-      name: '@dsh-usage-meter/usage-host'
-    - id: usage-meter-ui
-      name: '@dsh-usage-meter/usage-ui'
-EOF
-```
-
-> 早期用方式二装过、现在想切到 bundle：先 `dsh plugin --profile web remove @dsh-usage-meter/usage-host @dsh-usage-meter/usage-ui`，再删掉 profile patch 里手动加的两行，然后按方式一安装。
-
-### 完成安装（两种方式都一样）
-
-**重启 `dsh web`** ——宿主插件只在启动时加载，不会热更新。重启后打开 Web GUI，设置面板左侧会出现「用量统计」入口。
-
-### 升级
-
-```sh
-dsh plugin --profile web update @dsh-usage-meter/usage-bundle
-```
-
-然后重启 `dsh web`。
-
-## 使用
-
-打开 设置 → **用量统计**：
-
-- **累计用量**：每个模型一行，外加总计行，覆盖全部记录区间。
-- **每日用量**：每天一张表，含分模型行与当日合计。
-- 列：调用次数、输入（未命中缓存）、输出、缓存命中、缓存写入、计费合计。
-
-## 用量口径
-
-统计口径与 DeepSeek 官方计费一致（字段直接来自 harness 的 `TokenUsage`，`inputTokens` 已剔除缓存命中部分）：
-
-| 列 | 字段 | 含义 |
-|---|---|---|
-| 输入 | `inputTokens` | 未命中缓存的输入 tokens |
-| 输出 | `outputTokens` | 输出 tokens |
-| 缓存命中 | `cacheReadTokens` | 命中缓存的 tokens（`prompt_cache_hit_tokens`） |
-| 缓存写入 | `cacheWriteTokens` | 缓存写入 tokens（DeepSeek 目前不单独上报，通常为 0） |
-| 计费合计 | `inputTokens + cacheReadTokens + cacheWriteTokens` | 计费输入等价总量 |
-
-按「天」分桶默认使用**本地时区**；如需 UTC 可在配置中切换。
+还没有任何数据时，整页只显示一句提示；数据从安装时刻开始累计，启动时会把当时存活的会话回填一次。
 
 ## 配置
 
-在 profile 的 `cordis.patch.yml` 里按 id 覆盖 host 行（patch 是整行替换，需要重述要保留的字段）：
+默认按**本地时区**分天；想按 UTC 分天，在 `$DSH_HOME/profiles/web/cordis.patch.yml` 覆盖 host 行（patch 是整行替换，需重述保留字段）：
 
 ```yaml
 - id: usage-meter
   name: '@dsh-usage-meter/usage-host'
   config:
-    dir: ''              # 数据目录；空 = $DSH_HOME/usage-meter
-    timezone: local      # 按天分桶时区：local | utc
+    dir: ''
+    timezone: utc
 ```
 
-## 数据与存储
+## 安装
 
-`$DSH_HOME/usage-meter/usage.jsonl`，每行一条调用记录：
+### 从 npm 安装（推荐）
 
-```json
-{"time":1755130000000,"session":"session-1","provider":"deepseek-official","model":"deepseek-v4-flash","inputTokens":100,"outputTokens":20,"cacheReadTokens":30,"cacheWriteTokens":0}
+```sh
+dsh plugin --profile web add @dsh-usage-meter/usage-bundle @dsh-usage-meter/usage-host@0.1.1 --registry=https://registry.npmjs.org/
 ```
 
-- 从安装时刻开始记录；启动时会把当时存活的会话回填一次，更早的历史不会追溯。
-- 删除该文件（或整个 `usage-meter` 目录）即可清零重新统计。
+> **为什么显式钉 `usage-host@0.1.1`**：profile 启用了 pnpm 供应链 release-age 策略，发布不足 1 天的版本在范围解析时会被**静默跳过**——只写 bundle 可能装到有 bug 的 `0.1.0`（仪表盘报「读取用量数据失败」）。显式指定版本时 pnpm 会自动放行并安装。等 `0.1.1` 过了一天窗口后就不需要钉版本了。
 
-## 故障排查
+### 从本地代码库安装
 
-| 现象 | 原因与处理 |
-|---|---|
-| 仪表盘提示「读取用量数据失败」 | 先**重启 `dsh web`**（宿主插件只在启动时加载）并刷新页面。若仍失败，确认装到的是 `usage-host@0.1.1`（`node -e "console.log(require(process.env.HOME+'/.dsh/profiles/web/node_modules/@dsh-usage-meter/usage-host/package.json').version)"`）——供应链策略可能静默装成有 bug 的 `0.1.0`，按安装章节的钉版本命令重装。 |
-| 设置页显示「暂无用量记录」 | 安装后还没有完成过模型调用。只有当 `assistant/message` 携带 provider 用量采样时才会计数。 |
-| 设置页里没有「用量统计」入口 | profile 的 patch 行缺失。按安装步骤核对 `$DSH_HOME/profiles/web/cordis.patch.yml` 中的两行。 |
-| 安装前的会话没有数据 | 符合预期：安装时间之前的历史不会扫描（仅启动时存活的会话会被回填）。 |
+```sh
+dsh plugin --profile web add \
+  /path/to/dsh-usage-meter/packages/usage-host \
+  /path/to/dsh-usage-meter/packages/usage-ui
+```
 
-## 工作原理（维护者）
+再在 `$DSH_HOME/profiles/web/cordis.patch.yml` 追加两行：
 
-- host 插件 `UsageMeterService` 继承 `TypertRemoteService`（`@deepseek-ai/dsh-typert-protocol`），端点 `/api/usage-meter/summary` 通过 `ctx.typert.register()` **严格注册**到网关（不依赖 SRC 标记扫描——那套机制在 harness 源码启动与 npm 包解析出两份 protocol 实例时会失效，见 0.1.1 修复）。
-- 浏览器插件注册进 `settings.section` 槽位，通过 `connection.rpc.call('/api', 'usage-meter/summary', …)` 读取聚合快照。
-- 客户端 bundle 用移植自 harness 的 tsdown preset（`tsdown.preset.ts`）构建：`window.__ModuleLoader__.load(...)` 闭包工厂，平台模块外置，并带跨插件值导入纯度门。
+```yaml
+- insert:
+    - id: usage-meter
+      name: '@dsh-usage-meter/usage-host'
+    - id: usage-meter-ui
+      name: '@dsh-usage-meter/usage-ui'
+```
 
-## 开发
+两种方式装完都要 **重启 `dsh web`**（宿主插件只在启动时加载）。npm 分发的是构建好的 `lib/`，安装时不需要跑构建脚本。
+
+## 卸载 / 禁用
+
+不想卸载、只想临时换回默认界面——在 `$DSH_HOME/profiles/web/cordis.patch.yml` 加：
+
+```yaml
+- id: usage-meter
+  disabled: true
+- id: usage-meter-ui
+  disabled: true
+```
+
+重启 `dsh web` 即生效，删掉这几行恢复。彻底卸载：
+
+```sh
+dsh plugin --profile web remove @dsh-usage-meter/usage-bundle @dsh-usage-meter/usage-host
+```
+
+卸载不影响 `~/.dsh/usage-meter/usage.jsonl` 里的历史数据，重装后会接着统计。
+
+## 构建与开发
 
 ```sh
 pnpm install
-pnpm typecheck   # tsc -b（src）+ tsc -p tsconfig.tests.json（tests）
+pnpm typecheck   # tsc -b + tsc -p tsconfig.tests.json
 pnpm test        # vitest
-pnpm build       # tsdown：host lib + client bundle
+pnpm build       # tsdown → lib/index.js (host) + lib/client.js (browser)
 ```
 
-### 发布新版本（维护者）
+客户端 bundle 以 `window.__ModuleLoader__.load({ id, factory })` 闭包工厂输出，CSS Modules 由 lightningcss 哈希化并注入 `<style data-plugin="…">`。发布 npm 新版本：`pnpm -r version patch && pnpm -r publish`（**必须用 pnpm**——`usage-bundle` 的 `workspace:^` 依赖需要它改写成 `^版本号`）。
 
-```sh
-pnpm -r version patch   # 或 minor / major，统一升三个包的版本
-pnpm -r publish         # 按依赖顺序发布：host → ui → bundle
-```
+## 工作原理
 
-- 发布必须用 **pnpm**（`usage-bundle` 的 `workspace:^` 依赖需要 pnpm 改写成 `^版本号`；`npm publish` 不会改写）。
-- 账号开了 2FA 时，需要一枚勾选 **Bypass 2FA** 的 granular access token（登录态 token 发布会被 403 拒绝）。
+- **双插件结构** — host 半身（`usage-host`）负责记录与聚合，浏览器半身（`usage-ui`）负责设置页渲染；host 半身的 `apply()` 为空。
+- **Host 记录** — `UsageMeterService`（`TypertRemoteService`）监听 `session/event`，把 `request/header` 的模型路由和 `assistant/message` 的 usage 采样折叠进每日分模型桶，逐条追加 JSONL；端点 `/api/usage-meter/summary` 通过 `ctx.typert.register()` 严格注册，网关直接认领（不依赖 SRC 标记扫描，见 0.1.1 修复）。
+- **槽位** — 浏览器插件注册进 `settings.section`（id `usage`），随插件 fiber 一并注销。
+- **数据** — 浏览器通过 `connection.rpc.call('/api', 'usage-meter/summary', …)` 读取聚合快照，组件用本地状态持有。
+- **本地化** — 自持 `usage.meter` 命名空间，中文 + English，跟随 GUI 语言设置。
 
 ## 许可
 

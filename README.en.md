@@ -1,150 +1,127 @@
 # dsh-usage-meter
 
-Track your [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) token usage — per model, per day — with a dashboard inside the Web GUI.
+Per-model daily token usage for the DeepSeek Harness — recorded automatically, readable at a glance in the Web GUI settings.
 
-The plugin records every model call's **input, output, cache hits, and cache writes**, groups them by **model × calendar day**, persists the ledger locally, and renders a **Usage** page in the settings panel.
+English · [中文](README.md)
 
-English | [中文](README.md)
+---
 
-## Features
+Token usage is buried in session logs — figuring out how many tokens each model burned per month, or how much hit the cache, means digging. dsh-usage-meter folds every model call's **input, output, cache hits, and cache writes** into per-model daily statistics, persists them locally, and renders a dashboard in the settings page.
 
-- **Zero configuration**: install the plugin, restart `dsh web`, done. Every model call is recorded automatically.
-- **Per-model daily breakdown**: calls, uncached input, output, cache-read (cache hit), cache-write, and billed totals.
-- **Local persistence**: an append-only JSONL ledger at `$DSH_HOME/usage-meter/usage.jsonl`.
-- **Web GUI dashboard**: a settings page showing cumulative totals and per-day per-model tables.
-- **Safe & reversible**: a pure plugin — no core harness changes; uninstalling it leaves your data untouched.
+**🎯 Usage shouldn't have to be decoded — it should be readable at a glance.**
 
-## Requirements
+## Highlights
 
-- DeepSeek Harness with the **web profile** (`dsh web`).
-- To build from source: Node `^22.19 || >=24` and pnpm.
-- Packages are resolved from the npm `next` tag (`0.1.0-rc.6` line). Do **not** use the stale `latest` tag (`0.0.1-rc.1`), which references an unpublished dependency.
+- **Zero-config recording** — install, restart `dsh web`, done. Every model call is booked automatically.
+- **Per-model × day aggregation** — one table per day, one row per model: calls, input, output, cache read, cache write, billed.
+- **Input and cache, separated** — billed input splits into uncached / cache-read / cache-write, so the hit share is visible up front.
+- **Local persistence** — an append-only JSONL ledger at `$DSH_HOME/usage-meter/usage.jsonl`: inspect it, delete it, move it.
+- **Bilingual dashboard** — the **Usage** settings page ships in Chinese and English, following the Web GUI's language setting.
 
-## Installation
+## What it shows
 
-### Option A — npm package (recommended)
+Settings → **Usage**:
 
-All three packages (`usage-host` / `usage-ui` / `usage-bundle`) are published on npm under the `@dsh-usage-meter` organization:
+```
+Cumulative
+  model               calls   input(uncached)  output  cache read  billed
+  deepseek-v4-flash    10         3,762       6,477   2,913,280  2,917,042
+  deepseek-v4-pro      16        22,671      20,127   5,240,832  5,263,503
+  total                26        26,433      26,604   8,154,112  8,180,545
 
-```sh
-dsh plugin --profile web add @dsh-usage-meter/usage-bundle @dsh-usage-meter/usage-host@0.1.1 --registry=https://registry.npmjs.org/
+Daily · 2026-08-13  …(same breakdown, split into per-day tables with day totals)
 ```
 
-The bundle layer mounts both the host recorder and the browser dashboard automatically, and installs its two dependency packages into the profile.
+| Column | Meaning |
+|---|---|
+| Calls | Model calls completed that day |
+| Input (uncached) | Uncached input tokens (`inputTokens`) |
+| Output | Output tokens (`outputTokens`) |
+| Cache read | Cache-hit tokens (`cacheReadTokens`, DeepSeek's `prompt_cache_hit_tokens`) |
+| Cache write | Cache-write tokens (`cacheWriteTokens`; DeepSeek does not currently report these, usually 0) |
+| Billed | Input + cache read + cache write — the billed input-equivalent total |
 
-> **Why pin `usage-host@0.1.1` explicitly**: the profile enables pnpm's supply-chain release-age policy, which silently skips versions published less than a day ago during range resolution — a bare `add @dsh-usage-meter/usage-bundle` can land on the buggy `0.1.0` (dashboard shows “Failed to load usage data / HTTP 404”). Requesting the exact version lets pnpm auto-exempt and install it. Once `0.1.1` passes the age window, the pin is no longer required.
-
-### Option B — from this repository (source / pre-release)
-
-```sh
-# 1. Install the two packages into your web profile (absolute paths pass
-#    through the CLI unchanged)
-dsh plugin --profile web add \
-  /path/to/dsh-usage-meter/packages/usage-host \
-  /path/to/dsh-usage-meter/packages/usage-ui
-
-# 2. Mount both plugin rows in the profile's user patch layer
-cat >> "$DSH_HOME/profiles/web/cordis.patch.yml" <<'EOF'
-- insert:
-    - id: usage-meter
-      name: '@dsh-usage-meter/usage-host'
-    - id: usage-meter-ui
-      name: '@dsh-usage-meter/usage-ui'
-EOF
-```
-
-> Already installed via Option B and want to switch to the bundle? Run `dsh plugin --profile web remove @dsh-usage-meter/usage-host @dsh-usage-meter/usage-ui`, delete the two manually added rows from the profile patch, then install via Option A.
-
-### Finish (both options)
-
-**Restart `dsh web`** — host plugins are loaded at boot and do not hot-reload. Then open the Web GUI and you will see the **Usage** entry in the settings panel.
-
-### Upgrading
-
-```sh
-dsh plugin --profile web update @dsh-usage-meter/usage-bundle
-```
-
-Then restart `dsh web`.
-
-## Usage
-
-Open Settings → **Usage**:
-
-- **Cumulative usage** — one row per model plus a grand total, covering the whole recorded span.
-- **Daily usage** — one table per day with per-model rows and the day total.
-- Columns: calls, uncached input, output, cache read, cache write, billed.
-
-## How usage is accounted
-
-Counts follow DeepSeek's official billing vocabulary (they come straight from the harness `TokenUsage` fields; `inputTokens` is already cache-excluded):
-
-| Column | Field | Meaning |
-|---|---|---|
-| Input | `inputTokens` | Uncached input tokens |
-| Output | `outputTokens` | Output tokens |
-| Cache read | `cacheReadTokens` | Cache-hit tokens (`prompt_cache_hit_tokens`) |
-| Cache write | `cacheWriteTokens` | Cache-write tokens (DeepSeek does not currently report these; usually 0) |
-| Billed | `inputTokens + cacheReadTokens + cacheWriteTokens` | Total billed input-equivalent |
-
-Days are bucketed by the **local timezone** by default; switch to UTC in the configuration if you prefer.
+With no data yet the page shows a single hint line; recording starts at install time and backfills the sessions still alive at startup.
 
 ## Configuration
 
-Override the host row in your profile's `cordis.patch.yml` (patch layers replace whole row configs, so restate every field you keep):
+Days are bucketed by the **local timezone** by default. To use UTC, override the host row in `$DSH_HOME/profiles/web/cordis.patch.yml` (patches replace whole row configs, so restate every field you keep):
 
 ```yaml
 - id: usage-meter
   name: '@dsh-usage-meter/usage-host'
   config:
-    dir: ''              # data directory; empty = $DSH_HOME/usage-meter
-    timezone: local      # day bucketing: local | utc
+    dir: ''
+    timezone: utc
 ```
 
-## Data & storage
+## Install
 
-`$DSH_HOME/usage-meter/usage.jsonl`, one JSON line per recorded call:
+### From npm (recommended)
 
-```json
-{"time":1755130000000,"session":"session-1","provider":"deepseek-official","model":"deepseek-v4-flash","inputTokens":100,"outputTokens":20,"cacheReadTokens":30,"cacheWriteTokens":0}
+```sh
+dsh plugin --profile web add @dsh-usage-meter/usage-bundle @dsh-usage-meter/usage-host@0.1.1 --registry=https://registry.npmjs.org/
 ```
 
-- Recording starts at install time; sessions still live at startup are backfilled once. Older history is not retroactively scanned.
-- Deleting the file (or the `usage-meter` directory) resets the counters.
+> **Why pin `usage-host@0.1.1` explicitly**: the profile enables pnpm's supply-chain release-age policy, which silently skips versions published less than a day ago during range resolution — a bare bundle install can land on the buggy `0.1.0` (dashboard shows “Failed to load usage data”). Requesting the exact version lets pnpm auto-exempt and install it. Once `0.1.1` passes the age window, the pin is no longer required.
 
-## Troubleshooting
+### From a local checkout
 
-| Symptom | Cause & fix |
-|---|---|
-| Dashboard shows “Failed to load usage data” | First **restart `dsh web`** (host plugins load only at boot) and refresh the page. If it still fails, confirm `usage-host@0.1.1` is what got installed (`node -e "console.log(require(process.env.HOME+'/.dsh/profiles/web/node_modules/@dsh-usage-meter/usage-host/package.json').version)"`) — the supply-chain policy may have silently installed the buggy `0.1.0`; reinstall with the pinned command in the install section. |
-| Settings page shows “No usage recorded yet” | No model calls have completed since install. Usage is recorded when an `assistant/message` carries a provider usage sample. |
-| The settings entry is missing entirely | The profile patch rows are absent. Re-check the installation steps and the rows in `$DSH_HOME/profiles/web/cordis.patch.yml`. |
-| No data for a session from before the install | Expected: history before the install time is not scanned (only live sessions at startup are backfilled). |
+```sh
+dsh plugin --profile web add \
+  /path/to/dsh-usage-meter/packages/usage-host \
+  /path/to/dsh-usage-meter/packages/usage-ui
+```
 
-## How it works (maintainers)
+Then append two rows to `$DSH_HOME/profiles/web/cordis.patch.yml`:
 
-- The host plugin `UsageMeterService` extends `TypertRemoteService` (`@deepseek-ai/dsh-typert-protocol`); the `/api/usage-meter/summary` endpoint is **strictly registered** via `ctx.typert.register()` (not derived from the SRC marker scan — that scan reads a module-private table that splits across two protocol instances when the harness runs from source while this package resolves the protocol from the profile, the 0.1.1 fix).
-- The browser plugin registers into the `settings.section` slot and reads the snapshot over `connection.rpc.call('/api', 'usage-meter/summary', …)`.
-- The client bundle is built with a tsdown preset vendored from the harness (`tsdown.preset.ts`): a `window.__ModuleLoader__.load(...)` closure factory with platform modules externalized and a purity gate against cross-plugin value imports.
+```yaml
+- insert:
+    - id: usage-meter
+      name: '@dsh-usage-meter/usage-host'
+    - id: usage-meter-ui
+      name: '@dsh-usage-meter/usage-ui'
+```
 
-## Development
+Both paths require a **`dsh web` restart** (host plugins load only at boot). npm ships the built `lib/`, so no build runs at install time.
+
+## Uninstall / Disable
+
+To switch back to the default UI without uninstalling, add to `$DSH_HOME/profiles/web/cordis.patch.yml`:
+
+```yaml
+- id: usage-meter
+  disabled: true
+- id: usage-meter-ui
+  disabled: true
+```
+
+Restart `dsh web`; remove the lines to re-enable. To uninstall completely:
+
+```sh
+dsh plugin --profile web remove @dsh-usage-meter/usage-bundle @dsh-usage-meter/usage-host
+```
+
+Uninstalling does not touch `~/.dsh/usage-meter/usage.jsonl` — reinstall continues from the same ledger.
+
+## Build & develop
 
 ```sh
 pnpm install
-pnpm typecheck   # tsc -b (src) + tsc -p tsconfig.tests.json (tests)
+pnpm typecheck   # tsc -b + tsc -p tsconfig.tests.json
 pnpm test        # vitest
-pnpm build       # tsdown: host lib + client bundle
+pnpm build       # tsdown → lib/index.js (host) + lib/client.js (browser)
 ```
 
-### Releasing a new version (maintainers)
+The client bundle is emitted as `window.__ModuleLoader__.load({ id, factory })`; CSS Modules are hashed by lightningcss and injected as a `<style data-plugin="…">` tag. To release a new npm version: `pnpm -r version patch && pnpm -r publish` (**must use pnpm** — `usage-bundle`'s `workspace:^` dependencies need pnpm's version rewrite).
 
-```sh
-pnpm -r version patch   # or minor / major; bumps all three packages together
-pnpm -r publish         # topological order: host → ui → bundle
-```
+## How it works
 
-- Publishing must use **pnpm** — `usage-bundle`'s `workspace:^` dependencies are rewritten to `^<version>` only by pnpm (`npm publish` leaves them untouched).
-- With 2FA enabled on the account, publish requires a granular access token with **Bypass 2FA** enabled (a plain login token is rejected with 403).
+- **Two-plugin structure** — the host half (`usage-host`) records and aggregates; the browser half (`usage-ui`) renders the settings page; the host half's `apply()` is empty.
+- **Host recording** — `UsageMeterService` (`TypertRemoteService`) listens to `session/event`, folds `request/header` model routes and `assistant/message` usage samples into per-model daily buckets, appends one JSONL line per call; the `/api/usage-meter/summary` endpoint is **strictly registered** via `ctx.typert.register()` so the gateway claims it directly (no SRC marker scan — the 0.1.1 fix).
+- **Slot** — the browser plugin registers into `settings.section` (id `usage`); the registration is withdrawn with the plugin fiber.
+- **Data** — the browser reads the snapshot over `connection.rpc.call('/api', 'usage-meter/summary', …)` into component-local state.
+- **Locale** — owns the `usage.meter` namespace, Chinese and English, following the GUI language setting.
 
 ## License
 

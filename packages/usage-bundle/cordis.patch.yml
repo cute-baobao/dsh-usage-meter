@@ -1,0 +1,14 @@
+# The dsh-usage-meter bundle patch: one layer that mounts the host usage
+# recorder and the browser dashboard roster row over the profile's base layer.
+#
+# The usage-meter row is a cordis service plugin; the usage-meter-ui row is a
+# `dsh.client` roster entry the modules node half scans into the boot graph,
+# so the settings shell can render the dashboard section in the browser.
+# Patch layers replace whole row configs by id, so a deployment can restate
+# either row's config (e.g. `timezone: utc`) in a later layer.
+- insert:
+    - id: usage-meter
+      name: '@dsh-usage-meter/usage-host'
+
+    - id: usage-meter-ui
+      name: '@dsh-usage-meter/usage-ui'

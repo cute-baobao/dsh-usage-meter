@@ -1,0 +1,7 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/usage-host" },
+    { "path": "./packages/usage-ui" }
+  ]
+}

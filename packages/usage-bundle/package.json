@@ -1,0 +1,23 @@
+{
+  "name": "@dsh-usage-meter/usage-bundle",
+  "description": "Installable dsh profile bundle: mounts the usage recorder host plugin and its Web GUI dashboard in one layer.",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "cordis.patch.yml"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@dsh-usage-meter/usage-host": "workspace:^",
+    "@dsh-usage-meter/usage-ui": "workspace:^"
+  }
+}

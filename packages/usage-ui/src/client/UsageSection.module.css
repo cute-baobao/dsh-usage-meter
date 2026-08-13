@@ -1,0 +1,91 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 0 24px;
+}
+
+.heading {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.message {
+  color: #667085;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 8px 0;
+}
+
+.error {
+  color: #c0392b;
+  font-weight: 600;
+}
+
+.errorHint {
+  color: #8a5a00;
+}
+
+.errorDetail {
+  color: #667085;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th,
+.table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #e4e7ec;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table th {
+  color: #667085;
+  font-weight: 500;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.billed {
+  font-weight: 600;
+}
+
+.model {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.totalRow td {
+  border-top: 2px solid #d0d5dd;
+  font-weight: 600;
+}
+
+.days {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.dayCaption {
+  caption-side: top;
+  text-align: left;
+  font-weight: 600;
+  padding: 4px 0 2px;
+}
+
+.updatedAt {
+  color: #98a2b3;
+  font-size: 12px;
+  margin: 0;
+}

@@ -2,7 +2,7 @@
 
 Track your [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) token usage — per model, per day — with a dashboard inside the Web GUI.
 
-The plugin records every model call's **input, output, cache hits, and cache writes**, groups them by **model × calendar day**, persists the ledger locally, and renders a **用量统计 / Usage** page in the settings panel.
+The plugin records every model call's **input, output, cache hits, and cache writes**, groups them by **model × calendar day**, persists the ledger locally, and renders a **Usage** page in the settings panel.
 
 English | [中文](README.md)
 
@@ -55,7 +55,7 @@ EOF
 
 ### Finish (both options)
 
-**Restart `dsh web`** — host plugins are loaded at boot and do not hot-reload. Then open the Web GUI and you will see the **用量统计 / Usage** entry in the settings panel.
+**Restart `dsh web`** — host plugins are loaded at boot and do not hot-reload. Then open the Web GUI and you will see the **Usage** entry in the settings panel.
 
 ### Upgrading
 
@@ -67,11 +67,11 @@ Then restart `dsh web`.
 
 ## Usage
 
-Open Settings → **用量统计 / Usage**:
+Open Settings → **Usage**:
 
-- **累计用量** — one row per model plus a grand total, covering the whole recorded span.
-- **每日用量** — one table per day with per-model rows and the day total.
-- Columns: 调用次数 (calls), 输入 (uncached input), 输出 (output), 缓存命中 (cache read), 缓存写入 (cache write), 计费合计 (billed).
+- **Cumulative usage** — one row per model plus a grand total, covering the whole recorded span.
+- **Daily usage** — one table per day with per-model rows and the day total.
+- Columns: calls, uncached input, output, cache read, cache write, billed.
 
 ## How usage is accounted
 
@@ -79,11 +79,11 @@ Counts follow DeepSeek's official billing vocabulary (they come straight from th
 
 | Column | Field | Meaning |
 |---|---|---|
-| 输入 | `inputTokens` | Uncached input tokens |
-| 输出 | `outputTokens` | Output tokens |
-| 缓存命中 | `cacheReadTokens` | Cache-hit tokens (`prompt_cache_hit_tokens`) |
-| 缓存写入 | `cacheWriteTokens` | Cache-write tokens (DeepSeek does not currently report these; usually 0) |
-| 计费合计 | `inputTokens + cacheReadTokens + cacheWriteTokens` | Total billed input-equivalent |
+| Input | `inputTokens` | Uncached input tokens |
+| Output | `outputTokens` | Output tokens |
+| Cache read | `cacheReadTokens` | Cache-hit tokens (`prompt_cache_hit_tokens`) |
+| Cache write | `cacheWriteTokens` | Cache-write tokens (DeepSeek does not currently report these; usually 0) |
+| Billed | `inputTokens + cacheReadTokens + cacheWriteTokens` | Total billed input-equivalent |
 
 Days are bucketed by the **local timezone** by default; switch to UTC in the configuration if you prefer.
 
@@ -114,8 +114,8 @@ Override the host row in your profile's `cordis.patch.yml` (patch layers replace
 
 | Symptom | Cause & fix |
 |---|---|
-| Dashboard shows 「读取用量数据失败」 / “Failed to load usage data” | The running `dsh web` process predates the plugin (or its last upgrade). Host plugins load only at boot — **restart `dsh web`** and refresh the page. |
-| Settings page shows 「暂无用量记录」 / “No usage recorded yet” | No model calls have completed since install. Usage is recorded when an `assistant/message` carries a provider usage sample. |
+| Dashboard shows “Failed to load usage data” | The running `dsh web` process predates the plugin (or its last upgrade). Host plugins load only at boot — **restart `dsh web`** and refresh the page. |
+| Settings page shows “No usage recorded yet” | No model calls have completed since install. Usage is recorded when an `assistant/message` carries a provider usage sample. |
 | The settings entry is missing entirely | The profile patch rows are absent. Re-check the installation steps and the rows in `$DSH_HOME/profiles/web/cordis.patch.yml`. |
 | No data for a session from before the install | Expected: history before the install time is not scanned (only live sessions at startup are backfilled). |
 

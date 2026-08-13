@@ -82,7 +82,9 @@ export class UsageMeterService extends TypertRemoteService {
    * @param config - validated plugin configuration.
    */
   constructor(ctx: Context, config: Config) {
-    super(ctx, 'usageMeter')
+    // Distinct wire namespace (hyphenated) from the cordis service key: the
+    // gateway serves `/api/usage-meter/summary`, which the browser calls.
+    super(ctx, 'usageMeter', { namespace: 'usage-meter' })
     this.timezone = config.timezone ?? 'local'
     this.store = new JsonlUsageStore(join(resolveDir(ctx, config), LEDGER_FILE))
     this.ledger = new UsageLedger(this.timezone)

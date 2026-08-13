@@ -71,11 +71,11 @@ afterEach(async () => {
 })
 
 describe('UsageMeterService', () => {
-  it('exposes the usageMeter service key and one summary Remote method', async () => {
+  it('exposes the usage-meter wire namespace and one summary Remote method', async () => {
     const { ctx } = await mount()
     expect(ctx.usageMeter.typertRemote).toMatchObject({
       serviceKey: 'usageMeter',
-      namespace: 'usageMeter',
+      namespace: 'usage-meter',
     })
     expect(remoteMethods(ctx.usageMeter)).toEqual([
       { method: 'summary', invocation: { kind: 'direct' } },

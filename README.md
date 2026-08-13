@@ -16,9 +16,11 @@ DeepSeek Harness 用量统计插件：自动记录每次模型调用的 token �
 ## 安装
 
 ```sh
-dsh plugin --profile web add @dsh-usage-meter/usage-bundle @dsh-usage-meter/usage-host@0.1.1 @dsh-usage-meter/usage-ui@0.1.1 --registry=https://registry.npmjs.org/
+npx -p @deepseek-ai/dsh dsh plugin --profile web add @dsh-usage-meter/usage-bundle @dsh-usage-meter/usage-host@0.1.1 @dsh-usage-meter/usage-ui@0.1.1 --registry=https://registry.npmjs.org/
 ```
 
+> 与官方 `npx @deepseek-ai/dsh web` 同源的安装方式；如果你是用源码跑 dsh（`pnpm dsh web`），把开头的 `npx -p @deepseek-ai/dsh dsh` 换成 `pnpm dsh` 即可。
+>
 > 钉版本是因为 profile 的 pnpm 供应链策略会静默跳过发布不足 1 天的版本，可能装到有 bug 的 `0.1.0`。
 
 重启 `dsh web` 后，设置 → 用量统计 即可查看。

@@ -18,19 +18,13 @@ Token usage is buried in session logs — figuring out how many tokens each mode
 - **Local persistence** — an append-only JSONL ledger at `$DSH_HOME/usage-meter/usage.jsonl`: inspect it, delete it, move it.
 - **Bilingual dashboard** — the **Usage** settings page ships in Chinese and English, following the Web GUI's language setting.
 
-## What it shows
+## Screenshot
 
 Settings → **Usage**:
 
-```
-Cumulative
-  model               calls   input(uncached)  output  cache read  billed
-  deepseek-v4-flash    10         3,762       6,477   2,913,280  2,917,042
-  deepseek-v4-pro      16        22,671      20,127   5,240,832  5,263,503
-  total                26        26,433      26,604   8,154,112  8,180,545
+![Usage overview dashboard in DeepSeek Harness settings](docs/assets/usage-dashboard.png)
 
-Daily · 2026-08-13  …(same breakdown, split into per-day tables with day totals)
-```
+The page shows total tokens, request count, model count, daily trends, and a model breakdown. Hover the requests chart to see each model's request count for that day.
 
 | Column | Meaning |
 |---|---|

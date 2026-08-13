@@ -3,7 +3,7 @@
  * @module @dsh-usage-meter/usage-ui/client/UsageSection
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type PointerEvent } from 'react'
 import type {
   InjectFace,
   PropsLocale,
@@ -31,6 +31,7 @@ type LoadState =
   | { kind: 'ready'; summary: UsageSummary }
 
 type ChartPoint = { label: string; value: number; date: string }
+type TooltipRow = { label: string; value: string }
 
 const emptyBucket: UsageBucket = {
   calls: 0,
@@ -98,18 +99,47 @@ function areaPath(line: string, points: ChartPoint[], width: number, height: num
   return `${line} L ${lastX.toFixed(1)} ${(height - padding).toFixed(1)} L ${firstX.toFixed(1)} ${(height - padding).toFixed(1)} Z`
 }
 
-function UsageChart({ points, tone, label }: { points: ChartPoint[]; tone: 'blue' | 'violet'; label: string }): JSX.Element {
+function pointPosition(index: number, points: ChartPoint[], width: number, height: number, padding: number): { x: number; y: number } {
+  const max = Math.max(...points.map(point => point.value), 1)
+  const x = points.length === 1 ? width / 2 : padding + index * ((width - padding * 2) / (points.length - 1))
+  const y = height - padding - (points[index]!.value / max) * (height - padding * 2)
+  return { x, y }
+}
+
+function UsageChart({ points, tone, label, detailRows }: {
+  points: ChartPoint[]
+  tone: 'blue' | 'violet'
+  label: string
+  detailRows?: (point: ChartPoint) => TooltipRow[]
+}): JSX.Element {
   const width = 640
   const height = 220
   const padding = 28
-  const max = Math.max(...points.map(point => point.value), 1)
   const line = linePath(points, width, height, padding)
   const area = areaPath(line, points, width, height, padding)
   const grid = [0, 0.5, 1]
+  const [activeIndex, setActiveIndex] = useState<number | undefined>()
+  const activePoint = activeIndex === undefined ? undefined : points[activeIndex]
+  const activePosition = activeIndex === undefined ? undefined : pointPosition(activeIndex, points, width, height, padding)
+
+  function selectNearestPoint(event: PointerEvent<SVGSVGElement>): void {
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const ratio = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width))
+    const index = points.length === 1 ? 0 : Math.round(ratio * (points.length - 1))
+    setActiveIndex(index)
+  }
 
   return (
     <div className={css.chartWrap}>
-      <svg className={css.chart} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label} preserveAspectRatio="none">
+      <svg
+        className={css.chart}
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label={label}
+        preserveAspectRatio="none"
+        onPointerMove={selectNearestPoint}
+        onPointerLeave={() => { setActiveIndex(undefined) }}
+      >
         <defs>
           <linearGradient id={`usage-${tone}-fill`} x1="0" x2="0" y1="0" y2="1">
             <stop className={tone === 'violet' ? css.violetStart : css.areaStart} offset="0%" />
@@ -123,16 +153,28 @@ function UsageChart({ points, tone, label }: { points: ChartPoint[]; tone: 'blue
         <path className={`${css.area} ${tone === 'violet' ? css.violetArea : ''}`} d={area} />
         <path className={`${css.line} ${tone === 'violet' ? css.violetLine : ''}`} d={line} />
         {points.map((point, index) => {
-          const x = points.length === 1 ? width / 2 : padding + index * ((width - padding * 2) / (points.length - 1))
-          const y = height - padding - (point.value / max) * (height - padding * 2)
+          const { x, y } = pointPosition(index, points, width, height, padding)
           return (
-            <g key={point.date} className={css.point}>
-              <title>{`${point.date}: ${format(point.value)}`}</title>
+            <g key={point.date} className={`${css.point} ${activeIndex === index ? css.pointActive : ''}`}>
               <circle cx={x} cy={y} r="4" />
             </g>
           )
         })}
       </svg>
+      {activePoint !== undefined && activePosition !== undefined ? (
+        <div
+          className={css.tooltip}
+          style={{
+            left: `${Math.max(18, Math.min(82, activePosition.x / width * 100))}%`,
+            top: `${Math.max(8, activePosition.y / height * 100)}%`,
+          }}
+          role="status"
+        >
+          <strong>{activePoint.date}</strong>
+          <div className={css.tooltipSummary}><span>{label}</span><b>{format(activePoint.value)}</b></div>
+          {detailRows?.(activePoint).map(row => <div key={row.label} className={css.tooltipRow}><span>{row.label}</span><b>{row.value}</b></div>)}
+        </div>
+      ) : null}
       <div className={css.axis} aria-hidden="true">
         <span>{points[0]?.label}</span>
         {points.length > 2 ? <span>{points[Math.floor((points.length - 1) / 2)]?.label}</span> : null}
@@ -177,6 +219,10 @@ export function UsageSection({ t, fetchSummary }: UsageSectionProps): JSX.Elemen
   const callsPoints = pointsFor(summary, bucket => bucket.calls)
   const tokenPoints = pointsFor(summary, tokenTotal)
   const models = modelBuckets(summary)
+  const dayByDate = new Map(summary.days.map(day => [day.date, day]))
+  const requestRows = (point: ChartPoint): TooltipRow[] => Object.entries(dayByDate.get(point.date)?.models ?? {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([model, bucket]) => ({ label: model, value: `${format(bucket.calls)} ${t('metric.callsUnit')}` }))
 
   return (
     <main className={css.section}>
@@ -220,7 +266,7 @@ export function UsageSection({ t, fetchSummary }: UsageSectionProps): JSX.Elemen
 
       <section className={css.secondaryPanel}>
         <div className={css.panelHeading}><div><p className={css.panelLabel}>{t('chart.calls')}</p><strong>{format(totals.calls)}</strong></div><span className={css.range}>{t('chart.daily')}</span></div>
-        <UsageChart points={callsPoints} tone="violet" label={t('chart.calls')} />
+        <UsageChart points={callsPoints} tone="violet" label={t('chart.calls')} detailRows={requestRows} />
       </section>
     </main>
   )

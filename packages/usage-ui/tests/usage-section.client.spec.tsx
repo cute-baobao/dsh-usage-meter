@@ -91,6 +91,23 @@ describe('UsageSection', () => {
     expect(text.match(/150/g)?.length).toBeGreaterThanOrEqual(3)
   })
 
+  it('shows the active date total and per-model request count on the requests chart', async () => {
+    render(props({ fetchSummary: async () => summaryWithDays() }))
+    await act(async () => {})
+    const charts = container.querySelectorAll('svg')
+    const requestChart = charts.item(1) as SVGSVGElement
+    Object.defineProperty(requestChart, 'getBoundingClientRect', {
+      value: () => ({ left: 0, width: 640 }),
+    })
+    act(() => {
+      requestChart.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 320 }))
+    })
+    const tooltip = container.querySelector('[role="status"]')
+    expect(tooltip?.textContent).toContain('2026-08-13')
+    expect(tooltip?.textContent).toContain('flash')
+    expect(tooltip?.textContent).toContain('2')
+  })
+
   it('shows the error message when the fetch fails', async () => {
     render(props({ fetchSummary: async () => { throw new Error('boom') } }))
     await act(async () => {})

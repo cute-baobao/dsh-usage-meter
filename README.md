@@ -22,15 +22,17 @@
 
 ## 安装
 
-### 方式一：npm 包（发布后）
+### 方式一：npm 包（推荐）
+
+三个包（`usage-host` / `usage-ui` / `usage-bundle`）已发布在 npm 的 `@dsh-usage-meter` 组织下：
 
 ```sh
 dsh plugin --profile web add @dsh-usage-meter/usage-bundle
 ```
 
-bundle 层会自动挂载 host 记录器和浏览器仪表盘。
+bundle 层会自动挂载 host 记录器和浏览器仪表盘，并把两个依赖包一并装进 profile。
 
-### 方式二：从本仓库安装
+### 方式二：从本仓库安装（源码 / 未发布时）
 
 ```sh
 # 1. 把两个包装进 web profile（绝对路径不会被 CLI 改写）
@@ -48,9 +50,19 @@ cat >> "$DSH_HOME/profiles/web/cordis.patch.yml" <<'EOF'
 EOF
 ```
 
+> 早期用方式二装过、现在想切到 bundle：先 `dsh plugin --profile web remove @dsh-usage-meter/usage-host @dsh-usage-meter/usage-ui`，再删掉 profile patch 里手动加的两行，然后按方式一安装。
+
 ### 完成安装（两种方式都一样）
 
 **重启 `dsh web`** ——宿主插件只在启动时加载，不会热更新。重启后打开 Web GUI，设置面板左侧会出现「用量统计」入口。
+
+### 升级
+
+```sh
+dsh plugin --profile web update @dsh-usage-meter/usage-bundle
+```
+
+然后重启 `dsh web`。
 
 ## 使用
 
@@ -120,6 +132,16 @@ pnpm typecheck   # tsc -b（src）+ tsc -p tsconfig.tests.json（tests）
 pnpm test        # vitest
 pnpm build       # tsdown：host lib + client bundle
 ```
+
+### 发布新版本（维护者）
+
+```sh
+pnpm -r version patch   # 或 minor / major，统一升三个包的版本
+pnpm -r publish         # 按依赖顺序发布：host → ui → bundle
+```
+
+- 发布必须用 **pnpm**（`usage-bundle` 的 `workspace:^` 依赖需要 pnpm 改写成 `^版本号`；`npm publish` 不会改写）。
+- 账号开了 2FA 时，需要一枚勾选 **Bypass 2FA** 的 granular access token（登录态 token 发布会被 403 拒绝）。
 
 ## 许可
 

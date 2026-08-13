@@ -22,15 +22,17 @@ English | [中文](README.md)
 
 ## Installation
 
-### Option A — npm package (once published)
+### Option A — npm package (recommended)
+
+All three packages (`usage-host` / `usage-ui` / `usage-bundle`) are published on npm under the `@dsh-usage-meter` organization:
 
 ```sh
 dsh plugin --profile web add @dsh-usage-meter/usage-bundle
 ```
 
-The bundle layer mounts both the host recorder and the browser dashboard automatically.
+The bundle layer mounts both the host recorder and the browser dashboard automatically, and installs its two dependency packages into the profile.
 
-### Option B — from this repository
+### Option B — from this repository (source / pre-release)
 
 ```sh
 # 1. Install the two packages into your web profile (absolute paths pass
@@ -49,9 +51,19 @@ cat >> "$DSH_HOME/profiles/web/cordis.patch.yml" <<'EOF'
 EOF
 ```
 
+> Already installed via Option B and want to switch to the bundle? Run `dsh plugin --profile web remove @dsh-usage-meter/usage-host @dsh-usage-meter/usage-ui`, delete the two manually added rows from the profile patch, then install via Option A.
+
 ### Finish (both options)
 
 **Restart `dsh web`** — host plugins are loaded at boot and do not hot-reload. Then open the Web GUI and you will see the **用量统计 / Usage** entry in the settings panel.
+
+### Upgrading
+
+```sh
+dsh plugin --profile web update @dsh-usage-meter/usage-bundle
+```
+
+Then restart `dsh web`.
 
 ## Usage
 
@@ -121,6 +133,16 @@ pnpm typecheck   # tsc -b (src) + tsc -p tsconfig.tests.json (tests)
 pnpm test        # vitest
 pnpm build       # tsdown: host lib + client bundle
 ```
+
+### Releasing a new version (maintainers)
+
+```sh
+pnpm -r version patch   # or minor / major; bumps all three packages together
+pnpm -r publish         # topological order: host → ui → bundle
+```
+
+- Publishing must use **pnpm** — `usage-bundle`'s `workspace:^` dependencies are rewritten to `^<version>` only by pnpm (`npm publish` leaves them untouched).
+- With 2FA enabled on the account, publish requires a granular access token with **Bypass 2FA** enabled (a plain login token is rejected with 403).
 
 ## License
 

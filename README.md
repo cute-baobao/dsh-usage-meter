@@ -1,52 +1,45 @@
 # dsh-usage-meter
 
-DeepSeek Harness 用量统计插件：记录每天、每个模型消耗的 token 用量（输入 / 输出 / 缓存命中 / 缓存写入），持久化到本地，并在 Web GUI 的设置页里渲染成仪表盘。
+Track your [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) token usage — per model, per day — with a dashboard inside the Web GUI.
 
-## 功能
+The plugin records every model call's **input, output, cache hits, and cache writes**, groups them by **model × calendar day**, persists the ledger locally, and renders a **用量统计 / Usage** page in the settings panel.
 
-- **Host 记录器**（`@dsh-usage-meter/usage-host`）：监听 session 事件流，把 `request/header` 的模型路由和 `assistant/message` 的 usage 采样折叠成「模型 × 天」的用量桶，每条调用以一行 JSON 追加写入 `$DSH_HOME/usage-meter/usage.jsonl`。
-- **Web 仪表盘**（`@dsh-usage-meter/usage-ui`）：在 Web GUI 的设置页新增「用量统计」入口，展示累计用量、每日分模型明细（调用次数、输入、输出、缓存命中、缓存写入、计费合计）。
-- **安装层**（`@dsh-usage-meter/usage-bundle`）：一条 cordis patch，同时挂载 host 记录器和浏览器 roster 行。
+English | [中文](README.zh.md)
 
-## 用量口径
+## Features
 
-与 DeepSeek 官方计费口径一致（字段来自 harness 的 `TokenUsage`，`inputTokens` 是不含缓存的输入）：
+- **Zero configuration**: install the plugin, restart `dsh web`, done. Every model call is recorded automatically.
+- **Per-model daily breakdown**: calls, uncached input, output, cache-read (cache hit), cache-write, and billed totals.
+- **Local persistence**: an append-only JSONL ledger at `$DSH_HOME/usage-meter/usage.jsonl`.
+- **Web GUI dashboard**: a settings page showing cumulative totals and per-day per-model tables.
+- **Safe & reversible**: a pure plugin — no core harness changes; uninstalling it leaves your data untouched.
 
-- `输入` = `inputTokens`（未命中缓存的输入）
-- `缓存命中` = `cacheReadTokens`（DeepSeek 的 `prompt_cache_hit_tokens`）
-- `计费合计` = `inputTokens + cacheReadTokens + cacheWriteTokens`
-- `缓存写入` = `cacheWriteTokens`（DeepSeek 官方目前不单独上报，通常为 0）
+## Requirements
 
-按「天」分桶默认使用本地时区，可在配置里改为 `utc`。
+- DeepSeek Harness with the **web profile** (`dsh web`).
+- To build from source: Node `^22.19 || >=24` and pnpm.
+- Packages are resolved from the npm `next` tag (`0.1.0-rc.6` line). Do **not** use the stale `latest` tag (`0.0.1-rc.1`), which references an unpublished dependency.
 
-## 仓库结构
+## Installation
 
-```
-packages/
-  usage-host/      host 插件：聚合 + JSONL 持久化 + usage-meter Typert 远程服务
-  usage-ui/        client 插件：Web GUI 设置页仪表盘
-  usage-bundle/    可安装的 profile bundle（cordis.patch.yml）
-```
-
-## 安装
-
-### 方式一：发布到 npm 后（推荐）
+### Option A — npm package (once published)
 
 ```sh
 dsh plugin --profile web add @dsh-usage-meter/usage-bundle
 ```
 
-bundle 依赖会自动装进 profile，patch 会挂载两个插件行。
+The bundle layer mounts both the host recorder and the browser dashboard automatically.
 
-### 方式二：从本仓库直接安装（未发布时）
+### Option B — from this repository
 
 ```sh
-# 1. 把两个包装进 web profile（绝对路径不会被 CLI 重写）
+# 1. Install the two packages into your web profile (absolute paths pass
+#    through the CLI unchanged)
 dsh plugin --profile web add \
   /path/to/dsh-usage-meter/packages/usage-host \
   /path/to/dsh-usage-meter/packages/usage-ui
 
-# 2. 在 profile 的用户层挂载两个行
+# 2. Mount both plugin rows in the profile's user patch layer
 cat >> "$DSH_HOME/profiles/web/cordis.patch.yml" <<'EOF'
 - insert:
     - id: usage-meter
@@ -56,47 +49,79 @@ cat >> "$DSH_HOME/profiles/web/cordis.patch.yml" <<'EOF'
 EOF
 ```
 
-两种方式完成后重启 `dsh web`，设置页左侧会出现「用量统计」入口。
+### Finish (both options)
 
-### 配置
+**Restart `dsh web`** — host plugins are loaded at boot and do not hot-reload. Then open the Web GUI and you will see the **用量统计 / Usage** entry in the settings panel.
 
-在 profile 的 `cordis.patch.yml` 里按 id 覆盖整行配置（patch 是整行替换，需要重述要保留的字段）：
+## Usage
+
+Open Settings → **用量统计 / Usage**:
+
+- **累计用量** — one row per model plus a grand total, covering the whole recorded span.
+- **每日用量** — one table per day with per-model rows and the day total.
+- Columns: 调用次数 (calls), 输入 (uncached input), 输出 (output), 缓存命中 (cache read), 缓存写入 (cache write), 计费合计 (billed).
+
+## How usage is accounted
+
+Counts follow DeepSeek's official billing vocabulary (they come straight from the harness `TokenUsage` fields; `inputTokens` is already cache-excluded):
+
+| Column | Field | Meaning |
+|---|---|---|
+| 输入 | `inputTokens` | Uncached input tokens |
+| 输出 | `outputTokens` | Output tokens |
+| 缓存命中 | `cacheReadTokens` | Cache-hit tokens (`prompt_cache_hit_tokens`) |
+| 缓存写入 | `cacheWriteTokens` | Cache-write tokens (DeepSeek does not currently report these; usually 0) |
+| 计费合计 | `inputTokens + cacheReadTokens + cacheWriteTokens` | Total billed input-equivalent |
+
+Days are bucketed by the **local timezone** by default; switch to UTC in the configuration if you prefer.
+
+## Configuration
+
+Override the host row in your profile's `cordis.patch.yml` (patch layers replace whole row configs, so restate every field you keep):
 
 ```yaml
 - id: usage-meter
   name: '@dsh-usage-meter/usage-host'
   config:
-    dir: ''              # 数据目录；空 = $DSH_HOME/usage-meter
-    timezone: local      # 按天分桶时区：local | utc
+    dir: ''              # data directory; empty = $DSH_HOME/usage-meter
+    timezone: local      # day bucketing: local | utc
 ```
 
-## 数据文件
+## Data & storage
 
-`$DSH_HOME/usage-meter/usage.jsonl`，每行一条调用记录：
+`$DSH_HOME/usage-meter/usage.jsonl`, one JSON line per recorded call:
 
 ```json
 {"time":1755130000000,"session":"session-1","provider":"deepseek-official","model":"deepseek-v4-flash","inputTokens":100,"outputTokens":20,"cacheReadTokens":30,"cacheWriteTokens":0}
 ```
 
-记录从插件安装时刻开始收集；启动时会把当时已加载的会话回填一遍。插件安装之前的历史会话不会追溯（除非它们在安装时还活着）。
+- Recording starts at install time; sessions still live at startup are backfilled once. Older history is not retroactively scanned.
+- Deleting the file (or the `usage-meter` directory) resets the counters.
 
-## 工作原理
+## Troubleshooting
 
-- Host 侧 `UsageMeterService` 继承 `TypertRemoteService`（来自 `@deepseek-ai/dsh-typert-protocol`），自动向 API 网关暴露 `/api/usage-meter/summary`，浏览器直接通过该 RPC 读取聚合快照，无需任何代码生成。
-- Client 侧通过 `ctx.slots.inject('settings.section', …)` 注册设置页（与 ui-settings-plugins 相同的方式），数据只走 inject 回调 + 组件本地状态。
-- Client bundle 用移植自 harness 的 tsdown preset 构建：产出 `window.__ModuleLoader__.load(...)` 闭包工厂，react 等平台模块外置，跨插件值导入会被纯度门拒绝。
+| Symptom | Cause & fix |
+|---|---|
+| Dashboard shows 「读取用量数据失败」 / “Failed to load usage data” | The running `dsh web` process predates the plugin (or its last upgrade). Host plugins load only at boot — **restart `dsh web`** and refresh the page. |
+| Settings page shows 「暂无用量记录」 / “No usage recorded yet” | No model calls have completed since install. Usage is recorded when an `assistant/message` carries a provider usage sample. |
+| The settings entry is missing entirely | The profile patch rows are absent. Re-check the installation steps and the rows in `$DSH_HOME/profiles/web/cordis.patch.yml`. |
+| No data for a session from before the install | Expected: history before the install time is not scanned (only live sessions at startup are backfilled). |
 
-## 开发
+## How it works (maintainers)
+
+- The host plugin `UsageMeterService` extends `TypertRemoteService` (`@deepseek-ai/dsh-typert-protocol`) and exposes `/api/usage-meter/summary` — the gateway derives the endpoint from the service binding, no code generation.
+- The browser plugin registers into the `settings.section` slot and reads the snapshot over `connection.rpc.call('/api', 'usage-meter/summary', …)`.
+- The client bundle is built with a tsdown preset vendored from the harness (`tsdown.preset.ts`): a `window.__ModuleLoader__.load(...)` closure factory with platform modules externalized and a purity gate against cross-plugin value imports.
+
+## Development
 
 ```sh
 pnpm install
-pnpm typecheck   # tsc -b（src）+ tsc -p tsconfig.tests.json（tests）
+pnpm typecheck   # tsc -b (src) + tsc -p tsconfig.tests.json (tests)
 pnpm test        # vitest
-pnpm build       # tsdown：host lib + client bundle
+pnpm build       # tsdown: host lib + client bundle
 ```
 
-依赖发布在 npm `next` 标签的 `0.1.0-rc.6` 系列（`latest` 标签是陈旧的 `0.0.1-rc.1`，依赖已下架的 `@deepseek-ai/dsh-compact`，不要使用）。
-
-## 许可
+## License
 
 MIT

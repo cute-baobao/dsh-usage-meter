@@ -23,9 +23,26 @@
     "lib/types/**/*.js"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cute-baobao/dsh-usage-meter.git",
+    "directory": "packages/usage-host"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "plugin",
+    "usage",
+    "tokens",
+    "telemetry"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "tsdown",
-    "bundle": "tsdown"
+    "bundle": "tsdown",
+    "prepack": "pnpm build"
   },
   "dependencies": {
     "@deepseek-ai/cordis": "^4.0.1",

@@ -11,6 +11,21 @@
     "cordis.patch.yml"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cute-baobao/dsh-usage-meter.git",
+    "directory": "packages/usage-bundle"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "plugin",
+    "bundle",
+    "usage"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

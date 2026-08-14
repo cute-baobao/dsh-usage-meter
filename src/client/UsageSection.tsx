@@ -1,6 +1,6 @@
 /**
  * Usage dashboard section for the DeepSeek Harness settings surface.
- * @module @dsh-usage-meter/usage-ui/client/UsageSection
+ * @module @dsh-usage-meter/usage/client/UsageSection
  */
 
 import { useEffect, useState, type PointerEvent } from 'react'
@@ -10,7 +10,7 @@ import type {
   PropsRenderSlots,
   PropsRuntime,
 } from '@deepseek-ai/dsh-client-ui-slots'
-import type { UsageBucket, UsageSummary } from '@dsh-usage-meter/usage-host/types'
+import type { UsageBucket, UsageSummary } from '../types.ts'
 import { NS, type UsageMeterLocaleKey } from './locales.ts'
 import css from './UsageSection.module.css'
 

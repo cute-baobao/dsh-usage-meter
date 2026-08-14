@@ -3,7 +3,7 @@
  * `request/header` snapshots and project `assistant/message` usage samples into
  * {@link CallRecord}s. Extracted from the service so the aggregation logic is
  * unit-testable without a cordis context.
- * @module @dsh-usage-meter/usage-host/fold
+ * @module @dsh-usage-meter/usage/fold
  */
 
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'

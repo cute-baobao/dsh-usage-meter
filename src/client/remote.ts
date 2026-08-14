@@ -2,11 +2,11 @@
  * Wire call helpers for the `usage-meter` host remote. The client calls the
  * gateway's shared `/api` channel with the SRC-derived endpoint shape the
  * gateway dispatches to the host `UsageMeterService`.
- * @module @dsh-usage-meter/usage-ui/client/remote
+ * @module @dsh-usage-meter/usage/client/remote
  */
 
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import type { UsageSummary } from '@dsh-usage-meter/usage-host/types'
+import type { UsageSummary } from '../types.ts'
 
 /** Gateway channel carrying every Typert remote endpoint. */
 const API_CHANNEL = '/api' as const

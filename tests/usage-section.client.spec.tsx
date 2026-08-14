@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 // Type-only: brings the settings shell's SlotMap merge ('settings.section')
 // into this compilation face, like the plugin's own client entry does.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { UsageSummary } from '@dsh-usage-meter/usage-host/types'
+import type { UsageSummary } from '../src/types.ts'
 import { UsageSection, type UsageSectionProps } from '../src/client/UsageSection.tsx'
 
 // jsdom + react 18: opt into the act environment so act() drives real effects.

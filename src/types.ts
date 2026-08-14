@@ -3,7 +3,7 @@
  * Counts are DISJOINT (matching `TokenUsage` in @deepseek-ai/dsh-llm):
  * `inputTokens` is uncached input only; cached input is reported separately.
  * DeepSeek bills `input + cacheRead + cacheWrite`, reported as `billedTokens`.
- * @module @dsh-usage-meter/usage-host/types
+ * @module @dsh-usage-meter/usage/types
  */
 
 /** One completed model call recorded from an `assistant/message` usage sample. */

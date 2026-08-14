@@ -1,5 +1,5 @@
 /**
- * DeepSeek Harness usage recorder (host plane).
+ * DeepSeek Harness usage recorder (host half).
  *
  * A cordis Service plugin: listens to the `session/event` firehose, folds
  * `request/header` routes and `assistant/message` usage samples into a
@@ -7,11 +7,11 @@
  * under `$DSH_HOME/usage-meter/usage.jsonl`, and exposes the ledger through the
  * `usage-meter/summary` Typert remote endpoint the Web GUI dashboard calls.
  *
- * The service carries a `typertRemote` binding, so the API gateway claims
- * `/api/usage-meter/*` and dispatches the SRC-derived `summary` method without
- * any codegen.
+ * The single `@dsh-usage-meter/usage` package ships this host half as its
+ * default export and the browser dashboard under `./client`; its
+ * self-mounting `cordis.patch.yml` inserts one row mounting both halves.
  *
- * @module @dsh-usage-meter/usage-host
+ * @module @dsh-usage-meter/usage
  */
 
 import { join, resolve } from 'node:path'
@@ -51,7 +51,7 @@ declare module '@deepseek-ai/cordis' {
 /** Ledger file name inside the configured directory. */
 const LEDGER_FILE = 'usage.jsonl'
 
-/** The recorded session id for records produced before any route is known. */
+/** Resolve the data directory, defaulting under the harness home. */
 function resolveDir(ctx: Context, config: Config): string {
   const configured = config.dir
   return configured === undefined || configured.length === 0

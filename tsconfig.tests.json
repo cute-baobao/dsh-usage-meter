@@ -1,6 +1,6 @@
 {
-  // Typechecks the test trees (not part of the build references; vitest runs
-  // them untranspiled by tsc, so this project is the type gate for tests).
+  // Typechecks the test tree (not part of the build; vitest runs it
+  // untranspiled by tsc, so this project is the type gate for tests).
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "composite": false,
@@ -13,8 +13,8 @@
     "lib": ["ES2024", "DOM", "DOM.Iterable"]
   },
   "include": [
-    "packages/*/tests/**/*.ts",
-    "packages/*/tests/**/*.tsx",
-    "packages/*/src/**/*.d.ts"
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "src/**/*.d.ts"
   ]
 }

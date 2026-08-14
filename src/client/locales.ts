@@ -1,7 +1,7 @@
 /**
  * Usage dashboard locale dictionary and its LocaleNamespaceMap merge, so
  * registered components receive a typed `t` bound to this namespace.
- * @module @dsh-usage-meter/usage-ui/client/locales
+ * @module @dsh-usage-meter/usage/client/locales
  */
 
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
@@ -12,7 +12,7 @@ export const zh = {
   'nav': '用量统计',
   'loading': '正在读取用量数据…',
   'error': '读取用量数据失败',
-  'errorHint': '请确认 host 侧 usage-host 插件已安装；数据保存在 $DSH_HOME/usage-meter/usage.jsonl。',
+  'errorHint': '请确认 host 半身已安装（usage 插件）；数据保存在 $DSH_HOME/usage-meter/usage.jsonl。',
   'empty': '暂无用量记录。运行几次对话后，这里会按「模型 × 天」展示 token 用量。',
   'totals.title': '累计用量',
   'day.title': '每日用量',
@@ -46,7 +46,7 @@ export const en = {
   'nav': 'Usage',
   'loading': 'Loading usage data…',
   'error': 'Failed to load usage data',
-  'errorHint': 'Make sure the host-side usage-host plugin is installed; data lives at $DSH_HOME/usage-meter/usage.jsonl.',
+  'errorHint': 'Make sure the host half (usage plugin) is installed; data lives at $DSH_HOME/usage-meter/usage.jsonl.',
   'empty': 'No usage recorded yet. Run a few conversations and per-model daily token usage will show up here.',
   'totals.title': 'Cumulative usage',
   'day.title': 'Daily usage',

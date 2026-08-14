@@ -11,7 +11,7 @@
  * sees no markers. A strict registration is instance-independent, so the
  * service registers its endpoint explicitly instead of relying on SRC
  * derivation.
- * @module @dsh-usage-meter/usage-host/typert
+ * @module @dsh-usage-meter/usage/typert
  */
 
 import type {} from '@deepseek-ai/dsh-typert-registry'
@@ -21,7 +21,7 @@ import type { Context } from '@deepseek-ai/cordis'
 /** The package's host-face contribution, registered for the calling fiber. */
 export function registerUsageMeterRemote(ctx: Context): TypertDisposer {
   return ctx.typert.register({
-    package: '@dsh-usage-meter/usage-host',
+    package: '@dsh-usage-meter/usage',
     face: 'host',
     schemas: [],
     model: { services: [], events: [], objects: [] },

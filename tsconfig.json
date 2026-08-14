@@ -1,7 +1,10 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./packages/usage-host" },
-    { "path": "./packages/usage-ui" }
-  ]
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "jsx": "react-jsx",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"]
+  },
+  "include": ["src"]
 }

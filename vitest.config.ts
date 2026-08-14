@@ -43,8 +43,8 @@ export default defineConfig({
   plugins: [standardDecoratorPlugin()],
   test: {
     include: [
-      'packages/*/tests/**/*.spec.ts',
-      'packages/*/tests/**/*.spec.tsx',
+      'tests/**/*.spec.ts',
+      'tests/**/*.spec.tsx',
     ],
     // Client component specs opt into jsdom with a per-file pragma; the shared
     // default stays node.

@@ -16,19 +16,19 @@ English · [中文](README.md)
 ## Install
 
 ```sh
-npx -p @deepseek-ai/dsh dsh plugin --profile web add @dsh-usage-meter/usage-bundle @dsh-usage-meter/usage-host@0.1.1 @dsh-usage-meter/usage-ui@0.1.1 --registry=https://registry.npmjs.org/
+npx -p @deepseek-ai/dsh dsh plugin --profile web add @dsh-usage-meter/usage@0.2.0 --registry=https://registry.npmjs.org/
 ```
 
 > Same npx distribution as the official `npx @deepseek-ai/dsh web`; if you run dsh from source (`pnpm dsh web`), replace the leading `npx -p @deepseek-ai/dsh dsh` with `pnpm dsh`.
 >
-> The pins are because the profile's pnpm supply-chain policy silently skips versions published less than a day ago, which can install the buggy `0.1.0`.
+> The pin is because the profile's pnpm supply-chain policy silently skips versions published less than a day ago — right after a release a bare package name may fail to resolve, while an explicit version installs immediately.
 
 Restart `dsh web`, then open Settings → Usage.
 
 ## Uninstall
 
 ```sh
-dsh plugin --profile web remove @dsh-usage-meter/usage-bundle @dsh-usage-meter/usage-host @dsh-usage-meter/usage-ui
+dsh plugin --profile web remove @dsh-usage-meter/usage
 ```
 
 ## License

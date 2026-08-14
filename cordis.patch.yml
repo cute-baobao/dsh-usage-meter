@@ -1,0 +1,9 @@
+# The @dsh-usage-meter/usage self-mounting patch: one row that mounts both
+# halves of the plugin. The host default export is the recording service; the
+# package's `dsh.client` manifest lets the modules node half also serve the
+# browser dashboard from the same row. Patch layers replace whole row configs
+# by id, so a deployment can restate this row's config (e.g. `timezone: utc`)
+# in a later layer.
+- insert:
+    - id: usage-meter
+      name: '@dsh-usage-meter/usage'

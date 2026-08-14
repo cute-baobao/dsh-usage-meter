@@ -1,7 +1,7 @@
 /**
  * In-memory aggregation: fold {@link CallRecord}s into per-model daily buckets
  * and render {@link UsageSummary} snapshots. Pure — no I/O, no cordis.
- * @module @dsh-usage-meter/usage-host/ledger
+ * @module @dsh-usage-meter/usage/ledger
  */
 
 import type { CallRecord, UsageBucket, UsageDay, UsageSummary } from './types.ts'

@@ -2,7 +2,7 @@
  * Usage dashboard plugin, browser half — one `settings.section` page that
  * renders the per-model daily token usage snapshot served by the host
  * recorder over the `usage-meter/summary` remote endpoint.
- * @module @dsh-usage-meter/usage-ui/client
+ * @module @dsh-usage-meter/usage/client
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -29,7 +29,7 @@ export const inject = ['slots', 'locale', 'connection']
  */
 export function apply(ctx: Context): void {
   const connection = ctx.get('connection') as ConnectionHandle
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'usage-ui: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'usage: dictionaries')
   const t = ctx.locale.bind(NS)
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',

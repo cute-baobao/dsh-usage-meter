@@ -3,7 +3,7 @@
  * {@link CallRecord} as JSON. Writes are serialized through a promise tail so
  * concurrent event appends cannot interleave partial lines; the service flushes
  * the tail on dispose.
- * @module @dsh-usage-meter/usage-host/store
+ * @module @dsh-usage-meter/usage/store
  */
 
 import { appendFile, mkdir, readFile } from 'node:fs/promises'

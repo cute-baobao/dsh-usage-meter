@@ -184,6 +184,11 @@ function clientConfig(id: string): UserConfig {
     }],
     outputOptions: {
       entryFileNames: 'client.js',
+      // The Harness plugin loader evaluates exactly one client module and
+      // does not serve sibling Rollup chunks. Keep every dependency in the
+      // closure factory so `require("./chunk-*.cjs")` cannot escape the
+      // loader's module table.
+      inlineDynamicImports: true,
       // The map is served from /plugins/<scoped-package>/client.js.map. The
       // browser resolves its local sources back into URLs that mirror the
       // /packages/<group>/<package>/src directories; sourcesContent keeps them

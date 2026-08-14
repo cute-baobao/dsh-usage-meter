@@ -1,6 +1,6 @@
 /**
  * Usage dashboard plugin, browser half — one `settings.section` page that
- * renders the per-model daily token usage snapshot served by the host
+ * renders the per-model hourly token usage snapshot served by the host
  * recorder over the `usage-meter/summary` remote endpoint.
  * @module @dsh-usage-meter/usage/client
  */

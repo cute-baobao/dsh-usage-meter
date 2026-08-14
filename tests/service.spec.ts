@@ -105,13 +105,22 @@ describe('UsageMeterService', () => {
 
     const summary = await ctx.usageMeter.summary()
     expect(summary.models).toEqual(['flash'])
-    expect(summary.days[0]?.models.flash).toMatchObject({
-      calls: 2,
-      inputTokens: 110,
-      outputTokens: 25,
+    // The two messages land in different hours (10:30 and 11:00 UTC).
+    expect(summary.hours.map(hour => hour.hour)).toEqual(['2026-08-13 10:00', '2026-08-13 11:00'])
+    expect(summary.hours[0]?.models.flash).toMatchObject({
+      calls: 1,
+      inputTokens: 100,
+      outputTokens: 20,
       cacheReadTokens: 30,
-      billedTokens: 140,
+      billedTokens: 130,
     })
+    expect(summary.hours[1]?.models.flash).toMatchObject({
+      calls: 1,
+      inputTokens: 10,
+      outputTokens: 5,
+      billedTokens: 10,
+    })
+    expect(summary.totals).toMatchObject({ calls: 2, inputTokens: 110, outputTokens: 25, billedTokens: 140 })
 
     // Disposing the fiber runs the flush effect that awaits pending writes.
     await ctx.fiber.dispose()

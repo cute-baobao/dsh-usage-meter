@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CallRecord } from '../src/types.ts'
-import { addRecord, dayKey, UsageLedger, zeroBucket } from '../src/ledger.ts'
+import { addRecord, hourKey, UsageLedger, zeroBucket } from '../src/ledger.ts'
 
 function record(time: number, model: string, overrides: Partial<CallRecord> = {}): CallRecord {
   return {
@@ -16,34 +16,34 @@ function record(time: number, model: string, overrides: Partial<CallRecord> = {}
   }
 }
 
-describe('dayKey', () => {
-  it('buckets by UTC calendar date', () => {
-    // 2026-08-13T16:00:00Z — a date whose local representation differs by
+describe('hourKey', () => {
+  it('buckets by UTC hour', () => {
+    // 2026-08-13T16:45:00Z — a timestamp whose local representation differs by
     // timezone, so the assertion pins the UTC behavior exactly.
-    expect(dayKey(Date.UTC(2026, 7, 13, 16, 0, 0), 'utc')).toBe('2026-08-13')
+    expect(hourKey(Date.UTC(2026, 7, 13, 16, 45, 0), 'utc')).toBe('2026-08-13 16:00')
   })
 
-  it('buckets by local calendar date with zero padding', () => {
-    const time = new Date(2026, 0, 5, 12, 0, 0).getTime()
-    expect(dayKey(time, 'local')).toBe('2026-01-05')
+  it('buckets by local hour with zero padding', () => {
+    const time = new Date(2026, 0, 5, 9, 30, 0).getTime()
+    expect(hourKey(time, 'local')).toBe('2026-01-05 09:00')
   })
 })
 
 describe('UsageLedger', () => {
-  it('aggregates per model per day and sums billed tokens', () => {
+  it('aggregates per model per hour and sums billed tokens', () => {
     const ledger = new UsageLedger('utc', [
-      record(Date.UTC(2026, 7, 13, 10), 'flash', {
+      record(Date.UTC(2026, 7, 13, 10, 20), 'flash', {
         inputTokens: 100,
         outputTokens: 20,
         cacheReadTokens: 30,
       }),
-      record(Date.UTC(2026, 7, 13, 11), 'flash', { inputTokens: 10, outputTokens: 5 }),
-      record(Date.UTC(2026, 7, 14, 10), 'reasoner', { inputTokens: 50, outputTokens: 9 }),
+      record(Date.UTC(2026, 7, 13, 10, 50), 'flash', { inputTokens: 10, outputTokens: 5 }),
+      record(Date.UTC(2026, 7, 14, 10, 10), 'reasoner', { inputTokens: 50, outputTokens: 9 }),
     ])
     const summary = ledger.summary()
     expect(summary.models).toEqual(['flash', 'reasoner'])
-    expect(summary.days.map(day => day.date)).toEqual(['2026-08-13', '2026-08-14'])
-    const first = summary.days[0]
+    expect(summary.hours.map(hour => hour.hour)).toEqual(['2026-08-13 10:00', '2026-08-14 10:00'])
+    const first = summary.hours[0]
     expect(first?.models.flash).toEqual({
       calls: 2,
       inputTokens: 110,
@@ -62,6 +62,17 @@ describe('UsageLedger', () => {
       cacheWriteTokens: 0,
       billedTokens: 190,
     })
+  })
+
+  it('keeps records in distinct hours apart', () => {
+    const ledger = new UsageLedger('utc', [
+      record(Date.UTC(2026, 7, 13, 10, 59), 'flash'),
+      record(Date.UTC(2026, 7, 13, 11, 0), 'flash'),
+    ])
+    const summary = ledger.summary()
+    expect(summary.hours).toHaveLength(2)
+    expect(summary.hours[0]?.models.flash?.calls).toBe(1)
+    expect(summary.hours[1]?.models.flash?.calls).toBe(1)
   })
 
   it('seeds from records and continues folding', () => {

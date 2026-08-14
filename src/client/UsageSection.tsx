@@ -3,14 +3,15 @@
  * @module @dsh-usage-meter/usage/client/UsageSection
  */
 
-import { useEffect, useState, type PointerEvent } from 'react'
+import { useEffect, useState } from 'react'
 import type {
   InjectFace,
   PropsLocale,
   PropsRenderSlots,
   PropsRuntime,
 } from '@deepseek-ai/dsh-client-ui-slots'
-import type { UsageBucket, UsageSummary } from '../types.ts'
+import type { UsageBucket, UsageHour, UsageSummary } from '../types.ts'
+import { Bar, BarChart, CartesianGrid, Line, LineChart, Rectangle, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipProps } from 'recharts'
 import { NS, type UsageMeterLocaleKey } from './locales.ts'
 import css from './UsageSection.module.css'
 
@@ -30,8 +31,22 @@ type LoadState =
   | { kind: 'error'; message: string }
   | { kind: 'ready'; summary: UsageSummary }
 
-type ChartPoint = { label: string; value: number; date: string }
-type TooltipRow = { label: string; value: string }
+/** Harness-aligned categorical hues for model segments. */
+const MODEL_PALETTE = [
+  '#f59e0b',
+  '#f97316',
+  '#ef4444',
+  '#eab308',
+  '#fb7185',
+] as const
+
+const REQUEST_PALETTE = [
+  '#1677ff',
+  '#5b8ff9',
+  '#36cfc9',
+  '#7c5cff',
+  '#13c2c2',
+] as const
 
 const emptyBucket: UsageBucket = {
   calls: 0,
@@ -65,120 +80,128 @@ function addBuckets(left: UsageBucket, right: UsageBucket): UsageBucket {
   }
 }
 
-function shortDate(date: string): string {
-  const [, month = '', day = date] = date.split('-')
-  return month ? `${month}/${day}` : date
+/** `YYYY-MM-DD HH:00` → `HH:00` for the compact hourly axis. */
+function shortHour(hour: string): string {
+  return hour.split(' ').at(-1) ?? hour
 }
 
-function pointsFor(summary: UsageSummary, getValue: (bucket: UsageBucket) => number): ChartPoint[] {
-  return summary.days.map(day => ({ date: day.date, label: shortDate(day.date), value: getValue(day.totals) }))
+function axisLabel(hour: string, hours: UsageHour[]): string {
+  const dates = new Set(hours.map(item => item.hour.split(' ')[0]))
+  if (dates.size <= 1) return shortHour(hour)
+  const [date, time] = hour.split(' ')
+  return `${date?.slice(5) ?? date} ${time ?? ''}`.trim()
 }
 
-function modelBuckets(summary: UsageSummary): Record<string, UsageBucket> {
-  return summary.models.reduce<Record<string, UsageBucket>>((models, model) => {
-    const total = summary.days.reduce<UsageBucket>((sum, day) => addBuckets(sum, day.models[model] ?? emptyBucket), emptyBucket)
-    models[model] = total
-    return models
-  }, {})
+function modelColor(model: string, models: string[], tone: 'tokens' | 'calls' = 'tokens'): string {
+  const index = models.indexOf(model)
+  const palette = tone === 'calls' ? REQUEST_PALETTE : MODEL_PALETTE
+  return palette[index % palette.length] ?? palette[0]!
 }
 
-function linePath(points: ChartPoint[], width: number, height: number, padding: number): string {
-  const max = Math.max(...points.map(point => point.value), 1)
-  const plotWidth = width - padding * 2
-  const plotHeight = height - padding * 2
-  return points.map((point, index) => {
-    const x = points.length === 1 ? width / 2 : padding + index * (plotWidth / (points.length - 1))
-    const y = height - padding - (point.value / max) * plotHeight
-    return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`
-  }).join(' ')
+type ChartDatum = { hour: string; label: string; total: number; [model: string]: string | number }
+
+type BarShapeProps = {
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  fill?: string
+  dataKey?: string | number
+  payload?: ChartDatum
 }
 
-function areaPath(line: string, points: ChartPoint[], width: number, height: number, padding: number): string {
-  const firstX = points.length === 1 ? width / 2 : padding
-  const lastX = points.length === 1 ? width / 2 : width - padding
-  return `${line} L ${lastX.toFixed(1)} ${(height - padding).toFixed(1)} L ${firstX.toFixed(1)} ${(height - padding).toFixed(1)} Z`
+function ModelBarShape(props: BarShapeProps, model: string, models: string[]): JSX.Element {
+  const topModel = models.filter(candidate => Number(props.payload?.[candidate] ?? 0) > 0).at(-1)
+  return <Rectangle {...props} radius={topModel === model ? [9, 9, 0, 0] : 0} />
 }
 
-function pointPosition(index: number, points: ChartPoint[], width: number, height: number, padding: number): { x: number; y: number } {
-  const max = Math.max(...points.map(point => point.value), 1)
-  const x = points.length === 1 ? width / 2 : padding + index * ((width - padding * 2) / (points.length - 1))
-  const y = height - padding - (points[index]!.value / max) * (height - padding * 2)
-  return { x, y }
+function chartData(hours: UsageHour[], models: string[], getValue: (bucket: UsageBucket) => number): { data: ChartDatum[]; ticks: string[] } {
+  const data: ChartDatum[] = hours.map(hour => {
+    const values = models.reduce<Record<string, number>>((result, model) => {
+      result[model] = getValue(hour.models[model] ?? emptyBucket)
+      return result
+    }, {})
+    return { hour: hour.hour, label: axisLabel(hour.hour, hours), total: Object.values(values).reduce((sum, value) => sum + value, 0), ...values }
+  })
+  const ticks = [...new Set([data[0]?.label, data[Math.floor((data.length - 1) / 2)]?.label, data.at(-1)?.label].filter((value): value is string => value !== undefined))]
+  return { data, ticks }
 }
 
-function UsageChart({ points, tone, label, detailRows }: {
-  points: ChartPoint[]
-  tone: 'blue' | 'violet'
+type UsageTooltipProps = TooltipProps<number, string> & {
+  chartLabel: string
+  models: string[]
+}
+
+export function UsageTooltip({ active, payload, chartLabel, models, tone = 'tokens' }: UsageTooltipProps & { tone?: 'tokens' | 'calls' }): JSX.Element | null {
+  if (!active || payload === undefined || payload.length === 0) return null
+  const datum = payload[0]?.payload as ChartDatum | undefined
+  if (datum === undefined) return null
+  const rows = models.map(model => ({ model, value: Number(datum[model] ?? 0) })).filter(row => row.value > 0)
+  return (
+    <div className={css.tooltip} role="status">
+      <strong>{datum.hour}</strong>
+      <div className={css.tooltipSummary}><span>{chartLabel}</span><b>{format(datum.total)}</b></div>
+      {rows.map(row => (
+        <div key={row.model} className={css.tooltipRow}>
+          <span><span className={css.tooltipDot} style={{ background: modelColor(row.model, models, tone) }} />{row.model}</span>
+          <b>{format(row.value)}</b>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function StackedBarChart({ hours, models, getValue, label, tone }: {
+  hours: UsageHour[]
+  models: string[]
+  getValue: (bucket: UsageBucket) => number
   label: string
-  detailRows?: (point: ChartPoint) => TooltipRow[]
+  tone: 'tokens' | 'calls'
 }): JSX.Element {
-  const width = 640
-  const height = 220
-  const padding = 28
-  const line = linePath(points, width, height, padding)
-  const area = areaPath(line, points, width, height, padding)
-  const grid = [0, 0.5, 1]
-  const [activeIndex, setActiveIndex] = useState<number | undefined>()
-  const activePoint = activeIndex === undefined ? undefined : points[activeIndex]
-  const activePosition = activeIndex === undefined ? undefined : pointPosition(activeIndex, points, width, height, padding)
-
-  function selectNearestPoint(event: PointerEvent<SVGSVGElement>): void {
-    const bounds = event.currentTarget.getBoundingClientRect()
-    const ratio = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width))
-    const index = points.length === 1 ? 0 : Math.round(ratio * (points.length - 1))
-    setActiveIndex(index)
-  }
+  const { data, ticks } = chartData(hours, models, getValue)
 
   return (
     <div className={css.chartWrap}>
-      <svg
-        className={css.chart}
-        viewBox={`0 0 ${width} ${height}`}
-        role="img"
-        aria-label={label}
-        preserveAspectRatio="none"
-        onPointerMove={selectNearestPoint}
-        onPointerLeave={() => { setActiveIndex(undefined) }}
-      >
-        <defs>
-          <linearGradient id={`usage-${tone}-fill`} x1="0" x2="0" y1="0" y2="1">
-            <stop className={tone === 'violet' ? css.violetStart : css.areaStart} offset="0%" />
-            <stop className={tone === 'violet' ? css.violetEnd : css.areaEnd} offset="100%" />
-          </linearGradient>
-        </defs>
-        {grid.map(level => {
-          const y = height - padding - level * (height - padding * 2)
-          return <line key={level} className={css.gridLine} x1={padding} x2={width - padding} y1={y} y2={y} />
-        })}
-        <path className={`${css.area} ${tone === 'violet' ? css.violetArea : ''}`} d={area} />
-        <path className={`${css.line} ${tone === 'violet' ? css.violetLine : ''}`} d={line} />
-        {points.map((point, index) => {
-          const { x, y } = pointPosition(index, points, width, height, padding)
-          return (
-            <g key={point.date} className={`${css.point} ${activeIndex === index ? css.pointActive : ''}`}>
-              <circle cx={x} cy={y} r="4" />
-            </g>
-          )
-        })}
-      </svg>
-      {activePoint !== undefined && activePosition !== undefined ? (
-        <div
-          className={css.tooltip}
-          style={{
-            left: `${Math.max(18, Math.min(82, activePosition.x / width * 100))}%`,
-            top: `${Math.max(8, activePosition.y / height * 100)}%`,
-          }}
-          role="status"
-        >
-          <strong>{activePoint.date}</strong>
-          <div className={css.tooltipSummary}><span>{label}</span><b>{format(activePoint.value)}</b></div>
-          {detailRows?.(activePoint).map(row => <div key={row.label} className={css.tooltipRow}><span>{row.label}</span><b>{row.value}</b></div>)}
-        </div>
-      ) : null}
-      <div className={css.axis} aria-hidden="true">
-        <span>{points[0]?.label}</span>
-        {points.length > 2 ? <span>{points[Math.floor((points.length - 1) / 2)]?.label}</span> : null}
-        <span>{points.at(-1)?.label}</span>
+      <div className={css.legend} role="list">
+        {models.map(model => (
+          <span key={model} className={css.legendItem} role="listitem">
+            <span className={css.legendSwatch} style={{ background: modelColor(model, models, tone) }} />
+            {model}
+          </span>
+        ))}
+      </div>
+      <div className={css.chart}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+          <BarChart data={data} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid className={css.gridLine} vertical={false} />
+            <XAxis dataKey="label" ticks={ticks} tickLine={false} axisLine={false} tick={{ fill: 'var(--dsw-alias-label-tertiary)', fontSize: 11 }} />
+            <YAxis tickLine={false} axisLine={false} width={42} tick={{ fill: 'var(--dsw-alias-label-tertiary)', fontSize: 11 }} tickFormatter={formatCompact} />
+            <Tooltip cursor={false} allowEscapeViewBox={{ x: false, y: true }} wrapperStyle={{ zIndex: 20, outline: 'none' }} content={<UsageTooltip chartLabel={label} models={models} tone={tone} />} />
+            {models.map(model => <Bar key={model} dataKey={model} stackId="usage" fill={modelColor(model, models, tone)} maxBarSize={42} shape={(props: unknown) => ModelBarShape(props as BarShapeProps, model, models)} />)}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
+
+function HourlyLineChart({ hours, models, label }: { hours: UsageHour[]; models: string[]; label: string }): JSX.Element {
+  const { data, ticks } = chartData(hours, models, bucket => bucket.calls)
+  return (
+    <div className={css.chartWrap}>
+      <div className={css.legend} role="list">
+        {models.map(model => <span key={model} className={css.legendItem} role="listitem"><span className={css.legendSwatch} style={{ background: modelColor(model, models, 'calls') }} />{model}</span>)}
+      </div>
+      <div className={css.chart}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+          <LineChart data={data} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid className={css.gridLine} vertical={false} />
+            <XAxis dataKey="label" ticks={ticks} tickLine={false} axisLine={false} tick={{ fill: 'var(--dsw-alias-label-tertiary)', fontSize: 11 }} />
+            <YAxis tickLine={false} axisLine={false} width={42} tick={{ fill: 'var(--dsw-alias-label-tertiary)', fontSize: 11 }} tickFormatter={formatCompact} />
+            <Tooltip cursor={false} allowEscapeViewBox={{ x: false, y: true }} wrapperStyle={{ zIndex: 20, outline: 'none' }} content={<UsageTooltip chartLabel={label} models={models} tone="calls" />} />
+            {models.map(model => <Line key={model} type="monotone" dataKey={model} stroke={modelColor(model, models, 'calls')} strokeWidth={2.5} dot={false} activeDot={{ r: 4, strokeWidth: 2, fill: 'var(--dsw-alias-bg-module-platform)' }} />)}
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </div>
   )
@@ -212,17 +235,16 @@ export function UsageSection({ t, fetchSummary }: UsageSectionProps): JSX.Elemen
   }
 
   const { summary } = state
-  if (summary.days.length === 0) return <p className={css.message}>{t('empty')}</p>
+  if (summary.hours.length === 0) return <p className={css.message}>{t('empty')}</p>
 
   const totals = summary.totals
   const tokens = tokenTotal(totals)
-  const callsPoints = pointsFor(summary, bucket => bucket.calls)
-  const tokenPoints = pointsFor(summary, tokenTotal)
-  const models = modelBuckets(summary)
-  const dayByDate = new Map(summary.days.map(day => [day.date, day]))
-  const requestRows = (point: ChartPoint): TooltipRow[] => Object.entries(dayByDate.get(point.date)?.models ?? {})
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([model, bucket]) => ({ label: model, value: `${format(bucket.calls)} ${t('metric.callsUnit')}` }))
+  const models = summary.models
+  const modelBuckets = models.reduce<Record<string, UsageBucket>>((result, model) => {
+    const total = summary.hours.reduce<UsageBucket>((sum, hour) => addBuckets(sum, hour.models[model] ?? emptyBucket), emptyBucket)
+    result[model] = total
+    return result
+  }, {})
 
   return (
     <main className={css.section}>
@@ -235,23 +257,23 @@ export function UsageSection({ t, fetchSummary }: UsageSectionProps): JSX.Elemen
 
       <section className={css.metrics} aria-label={t('dashboard.title')}>
         <MetricCard accent="blue" label={t('metric.tokens')} value={formatCompact(tokens)} detail={`${format(tokens)} ${t('metric.tokensUnit')}`} />
-        <MetricCard accent="violet" label={t('metric.calls')} value={format(totals.calls)} detail={`${summary.days.length} ${t('metric.activeDays')}`} />
-        <MetricCard accent="cyan" label={t('metric.models')} value={format(summary.models.length)} detail={t('metric.modelsDetail')} />
+        <MetricCard accent="violet" label={t('metric.calls')} value={format(totals.calls)} detail={`${summary.hours.length} ${t('metric.activeHours')}`} />
+        <MetricCard accent="cyan" label={t('metric.models')} value={format(models.length)} detail={t('metric.modelsDetail')} />
       </section>
 
       <section className={css.primaryPanel}>
         <div className={css.panelHeading}>
           <div><p className={css.panelLabel}>{t('chart.tokens')}</p><strong>{formatCompact(tokens)}</strong></div>
-          <span className={css.range}>{summary.days[0]?.date} — {summary.days.at(-1)?.date}</span>
+          <span className={css.range}>{t('chart.hourly')}</span>
         </div>
-        <UsageChart points={tokenPoints} tone="blue" label={t('chart.tokens')} />
+        <StackedBarChart hours={summary.hours} models={models} getValue={tokenTotal} label={t('metric.tokens')} tone="tokens" />
       </section>
 
       <section className={css.modelSection}>
         <div className={css.sectionHeading}><h3>{t('models.title')}</h3><span>{t('models.description')}</span></div>
         <div className={css.modelGrid}>
-          {summary.models.map(model => {
-            const bucket = models[model] ?? emptyBucket
+          {models.map(model => {
+            const bucket = modelBuckets[model] ?? emptyBucket
             return (
               <article key={model} className={css.modelCard}>
                 <div className={css.modelTop}><span className={css.modelName}>{model}</span><span>{format(bucket.calls)} {t('metric.callsUnit')}</span></div>
@@ -264,9 +286,19 @@ export function UsageSection({ t, fetchSummary }: UsageSectionProps): JSX.Elemen
         </div>
       </section>
 
-      <section className={css.secondaryPanel}>
-        <div className={css.panelHeading}><div><p className={css.panelLabel}>{t('chart.calls')}</p><strong>{format(totals.calls)}</strong></div><span className={css.range}>{t('chart.daily')}</span></div>
-        <UsageChart points={callsPoints} tone="violet" label={t('chart.calls')} detailRows={requestRows} />
+      <section className={css.requestSection} aria-label={t('chart.calls')}>
+        <div className={css.panelHeading}><div><p className={css.panelLabel}>{t('chart.calls')}</p><strong>{format(totals.calls)}</strong></div><span className={css.range}>{t('chart.hourly')}</span></div>
+        <div className={css.modelChartGrid}>
+          {models.map(model => {
+            const bucket = modelBuckets[model] ?? emptyBucket
+            return (
+              <article key={model} className={css.modelChartCard}>
+                <div className={css.modelChartHeading}><strong>{model}</strong><span>{format(bucket.calls)} {t('metric.callsUnit')}</span></div>
+                <HourlyLineChart hours={summary.hours} models={[model]} label={t('metric.calls')} />
+              </article>
+            )
+          })}
+        </div>
       </section>
     </main>
   )

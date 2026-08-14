@@ -50,6 +50,7 @@
 .metricCard,
 .primaryPanel,
 .secondaryPanel,
+.requestSection,
 .modelCard {
   box-sizing: border-box;
   border-radius: 12px;
@@ -85,8 +86,39 @@
 }
 
 .primaryPanel,
-.secondaryPanel {
+.secondaryPanel,
+.requestSection {
   padding: 18px 20px 14px;
+}
+
+.modelChartGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.modelChartCard {
+  min-width: 0;
+  padding: 14px 16px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-module-platform);
+}
+
+.modelChartHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+}
+
+.modelChartHeading strong {
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .panelHeading {
@@ -119,6 +151,35 @@
 .chartWrap {
   position: relative;
   margin-top: 14px;
+  z-index: 0;
+  overflow: visible;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin: 0 4px 10px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legendSwatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
 }
 
 .chart {
@@ -128,73 +189,24 @@
   overflow: visible;
 }
 
+.chart :global(.recharts-wrapper),
+.chart :global(.recharts-surface) {
+  overflow: visible;
+}
+
+.chartWrap :global(.recharts-tooltip-wrapper) {
+  z-index: 20 !important;
+  pointer-events: none;
+}
+
 .gridLine {
   stroke: var(--dsw-alias-border-l2);
   stroke-width: 1;
 }
 
-.area {
-  fill: url(#usage-blue-fill);
-  opacity: 0.2;
-}
-
-.violetArea {
-  fill: url(#usage-violet-fill);
-}
-
-.areaStart {
-  stop-color: var(--dsw-alias-button-info-fill);
-  stop-opacity: 0.52;
-}
-
-.areaEnd {
-  stop-color: var(--dsw-alias-button-info-fill);
-  stop-opacity: 0;
-}
-
-.violetStart {
-  stop-color: var(--dsw-alias-state-business-primary);
-  stop-opacity: 0.38;
-}
-
-.violetEnd {
-  stop-color: var(--dsw-alias-state-business-primary);
-  stop-opacity: 0;
-}
-
-.line {
-  fill: none;
-  stroke: var(--dsw-alias-button-info-fill);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-}
-
-.violetLine {
-  stroke: var(--dsw-alias-state-business-primary);
-}
-
-.point {
-  fill: var(--dsw-alias-button-info-fill);
-  opacity: 0;
-  transition: opacity 120ms linear;
-}
-
-.violetLine ~ .point {
-  fill: var(--dsw-alias-state-business-primary);
-}
-
-.chart:hover .point {
-  opacity: 1;
-}
-
-.pointActive {
-  opacity: 1;
-}
-
 .tooltip {
-  position: absolute;
-  z-index: 1;
+  position: relative;
+  z-index: 20;
   min-width: 176px;
   max-width: 260px;
   padding: 13px 15px;
@@ -206,7 +218,7 @@
   font-size: 12px;
   line-height: 18px;
   pointer-events: none;
-  transform: translate(-50%, -50%);
+  transform: none;
 }
 
 .tooltip strong {
@@ -233,11 +245,19 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-.tooltipRow span {
+.tooltipRow > span {
   overflow: hidden;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tooltipDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 2px;
 }
 
 .tooltip b {
@@ -362,8 +382,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .modelCard,
-  .point {
+  .modelCard {
     transition-duration: 0ms;
   }
 }
@@ -390,7 +409,8 @@
   }
 
   .primaryPanel,
-  .secondaryPanel {
+  .secondaryPanel,
+  .requestSection {
     padding: 16px 14px 13px;
   }
 
@@ -412,4 +432,5 @@
   .modelGrid {
     grid-template-columns: minmax(0, 1fr);
   }
+
 }

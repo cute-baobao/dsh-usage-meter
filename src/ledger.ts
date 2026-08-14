@@ -1,25 +1,27 @@
 /**
- * In-memory aggregation: fold {@link CallRecord}s into per-model daily buckets
+ * In-memory aggregation: fold {@link CallRecord}s into per-model hourly buckets
  * and render {@link UsageSummary} snapshots. Pure — no I/O, no cordis.
  * @module @dsh-usage-meter/usage/ledger
  */
 
-import type { CallRecord, UsageBucket, UsageDay, UsageSummary } from './types.ts'
+import type { CallRecord, UsageBucket, UsageHour, UsageSummary } from './types.ts'
 
-/** Day-bucketing timezone. */
-export type DayTimezone = 'local' | 'utc'
+/** Hour-bucketing timezone. */
+export type HourTimezone = 'local' | 'utc'
 
 /**
- * Calendar day key for a Unix epoch millisecond timestamp.
+ * Hour key for a Unix epoch millisecond timestamp.
  * @param time - Unix epoch milliseconds.
- * @param timezone - `local` uses the process timezone, `utc` the UTC date.
- * @returns `YYYY-MM-DD`.
+ * @param timezone - `local` uses the process timezone, `utc` the UTC hour.
+ * @returns `YYYY-MM-DD HH:00`.
  */
-export function dayKey(time: number, timezone: DayTimezone): string {
-  if (timezone === 'utc') return new Date(time).toISOString().slice(0, 10)
+export function hourKey(time: number, timezone: HourTimezone): string {
   const date = new Date(time)
   const pad = (value: number): string => String(value).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+  if (timezone === 'utc') {
+    return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:00`
+  }
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:00`
 }
 
 /** An empty bucket; mutate with {@link addRecord}. */
@@ -55,29 +57,29 @@ export function addBucket(target: UsageBucket, source: UsageBucket): void {
 }
 
 /**
- * Durable per-model daily usage. Seeded from persisted records at startup and
+ * Durable per-model hourly usage. Seeded from persisted records at startup and
  * grown by the live event firehose; `summary()` snapshots the current state.
  */
 export class UsageLedger {
-  private readonly timezone: DayTimezone
-  private readonly days = new Map<string, Map<string, UsageBucket>>()
+  private readonly timezone: HourTimezone
+  private readonly hours = new Map<string, Map<string, UsageBucket>>()
 
   /**
-   * @param timezone - day-bucketing timezone.
+   * @param timezone - hour-bucketing timezone.
    * @param records - seed records (the persisted ledger tail, if any).
    */
-  constructor(timezone: DayTimezone, records: readonly CallRecord[] = []) {
+  constructor(timezone: HourTimezone, records: readonly CallRecord[] = []) {
     this.timezone = timezone
     for (const record of records) this.record(record)
   }
 
   /** Fold one call record into the ledger. */
   record(record: CallRecord): void {
-    const date = dayKey(record.time, this.timezone)
-    let models = this.days.get(date)
+    const hour = hourKey(record.time, this.timezone)
+    let models = this.hours.get(hour)
     if (models === undefined) {
       models = new Map<string, UsageBucket>()
-      this.days.set(date, models)
+      this.hours.set(hour, models)
     }
     let bucket = models.get(record.model)
     if (bucket === undefined) {
@@ -91,25 +93,25 @@ export class UsageLedger {
   summary(): UsageSummary {
     const models = new Set<string>()
     const totals = zeroBucket()
-    const days: UsageDay[] = []
-    for (const date of [...this.days.keys()].sort()) {
-      const modelsMap = this.days.get(date) as Map<string, UsageBucket>
-      const dayModels: Record<string, UsageBucket> = {}
-      const dayTotals = zeroBucket()
+    const hours: UsageHour[] = []
+    for (const hour of [...this.hours.keys()].sort()) {
+      const modelsMap = this.hours.get(hour) as Map<string, UsageBucket>
+      const hourModels: Record<string, UsageBucket> = {}
+      const hourTotals = zeroBucket()
       for (const model of [...modelsMap.keys()].sort()) {
         const bucket = modelsMap.get(model) as UsageBucket
         models.add(model)
-        dayModels[model] = { ...bucket }
-        addBucket(dayTotals, bucket)
+        hourModels[model] = { ...bucket }
+        addBucket(hourTotals, bucket)
         addBucket(totals, bucket)
       }
-      days.push({ date, models: dayModels, totals: dayTotals })
+      hours.push({ hour, models: hourModels, totals: hourTotals })
     }
     return {
       generatedAt: Date.now(),
       timezone: this.timezone,
       models: [...models].sort(),
-      days,
+      hours,
       totals,
     }
   }

@@ -20,7 +20,7 @@ describe('fetchUsageSummary', () => {
       generatedAt: 1,
       timezone: 'local',
       models: ['flash'],
-      days: [],
+      hours: [],
       totals: {
         calls: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, billedTokens: 0,
       },

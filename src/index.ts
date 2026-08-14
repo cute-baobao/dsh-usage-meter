@@ -3,7 +3,7 @@
  *
  * A cordis Service plugin: listens to the `session/event` firehose, folds
  * `request/header` routes and `assistant/message` usage samples into a
- * per-model daily {@link UsageLedger}, persists every call as one JSONL line
+ * per-model hourly {@link UsageLedger}, persists every call as one JSONL line
  * under `$DSH_HOME/usage-meter/usage.jsonl`, and exposes the ledger through the
  * `usage-meter/summary` Typert remote endpoint the Web GUI dashboard calls.
  *
@@ -21,15 +21,15 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import s from '@deepseek-ai/schemastery'
 import { applyEvent, createSessionFoldState, type SessionFoldState } from './fold.ts'
-import { UsageLedger, type DayTimezone } from './ledger.ts'
+import { UsageLedger, type HourTimezone } from './ledger.ts'
 import { JsonlUsageStore } from './store.ts'
 import { registerUsageMeterRemote } from './typert.ts'
 import type { CallRecord, UsageSummary } from './types.ts'
 
-export type { CallRecord, UsageBucket, UsageDay, UsageSummary } from './types.ts'
-export type { DayTimezone } from './ledger.ts'
+export type { CallRecord, UsageBucket, UsageHour, UsageSummary } from './types.ts'
+export type { HourTimezone } from './ledger.ts'
 export type { SessionFoldState } from './fold.ts'
-export { dayKey, UsageLedger, zeroBucket } from './ledger.ts'
+export { hourKey, UsageLedger, zeroBucket } from './ledger.ts'
 export { parseRecord, JsonlUsageStore } from './store.ts'
 export { applyEvent, createSessionFoldState } from './fold.ts'
 
@@ -37,8 +37,8 @@ export { applyEvent, createSessionFoldState } from './fold.ts'
 export interface Config {
   /** Directory holding `usage.jsonl`; empty resolves to `$DSH_HOME/usage-meter`. */
   readonly dir?: string
-  /** Day-bucketing timezone; defaults to the process timezone (`local`). */
-  readonly timezone?: DayTimezone
+  /** Hour-bucketing timezone; defaults to the process timezone (`local`). */
+  readonly timezone?: HourTimezone
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -72,7 +72,7 @@ export class UsageMeterService extends TypertRemoteService {
     timezone: s.union([s.const('local'), s.const('utc')]).default('local'),
   })
 
-  private readonly timezone: DayTimezone
+  private readonly timezone: HourTimezone
   private readonly store: JsonlUsageStore
   private readonly sessionState = new Map<string, SessionFoldState>()
   private ledger: UsageLedger
@@ -138,7 +138,7 @@ export class UsageMeterService extends TypertRemoteService {
   }
 
   /**
-   * Snapshot the complete per-model daily usage.
+   * Snapshot the complete per-model hourly usage.
    * @returns the current ledger summary.
    */
   @Remote('summary')

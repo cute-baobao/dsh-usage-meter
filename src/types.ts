@@ -38,13 +38,13 @@ export interface UsageBucket {
   billedTokens: number
 }
 
-/** One calendar day's per-model buckets plus the day total. */
-export interface UsageDay {
-  /** Local or UTC calendar date, `YYYY-MM-DD`, per the configured timezone. */
-  date: string
+/** One hour's per-model buckets plus the hour total. */
+export interface UsageHour {
+  /** Local or UTC hour, `YYYY-MM-DD HH:00`, per the configured timezone. */
+  hour: string
   /** Per-model buckets, keyed by model id, sorted ascending. */
   models: Record<string, UsageBucket>
-  /** Sum over every model of that day. */
+  /** Sum over every model of that hour. */
   totals: UsageBucket
 }
 
@@ -52,12 +52,12 @@ export interface UsageDay {
 export interface UsageSummary {
   /** Snapshot timestamp (Unix epoch milliseconds). */
   generatedAt: number
-  /** Day-bucketing timezone. */
+  /** Hour-bucketing timezone. */
   timezone: 'local' | 'utc'
   /** Distinct model ids seen, sorted ascending. */
   models: string[]
-  /** Days ascending by date. */
-  days: UsageDay[]
+  /** Hours ascending by hour. */
+  hours: UsageHour[]
   /** Sum over the whole recorded span. */
   totals: UsageBucket
 }
